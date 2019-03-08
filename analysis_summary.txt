@@ -1,0 +1,336 @@
+Summary:
+We compared two methods of estimate true Bd load: first, we used strict cut-offs where Bd values must be over 5 individually, but also to have at least one (of three) tested values over 50. 
+The second method for estimating Bd load was to model Bd load using a Poisson process, and then ask whether the expected Bd load is statistically different from zero.
+We find both models yield the approximate same amount; the Poisson process was more liberal in assigning "infected" status, but these discrepancies make sense logically since the values for those are generally small but consistent between the three measurements.
+
+We adjusted the time variable so that time is continuous from time point 1-16.
+Osse was not sampled the first week, so we started its time at time point 2. 
+Bubo was also strange because it was the only species sampled at time point 10; all other species skipped this time point. So we adjusted for this.
+
+We found a small error where Raca10 had 2 time point 3's and Buma11 has 2 time point 2's; we believe this  is a data entry mistake and have changed one fo the Buma11's to Buma9 and one of the Raca 10's to Raca 9. This change is supported by the other metadata columns.
+
+There were also 14 individuals that were contaminated upon arrival. We removed these individuals from analyses.
+
+The final OTU table was filtered by:
+(1) changing all read values less than 5 to 0
+(2) removing OTUs that had less than 100 total reads in the entire dataset
+(3) removing all samples with less than 5000 reads
+
+PRELIMINARY FINDINGS:
+- Among control individuals, composition of microbiome is different between species, time, and interaction (ADONIS; all p < 0.001; sp R2 = 0.551, timeR2 = 0.051, sp:timeR2 = 0.053)
+	-shows community composition is changing, and that different species are changing differently over time.
+Call:
+adonis(formula = dist(dm.filt.con) ~ species * time, data = mf_con_without_init_infect) 
+
+Permutation: free
+Number of permutations: 999
+
+Terms added sequentially (first to last)
+
+              Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
+species        4    424.12 106.030  78.785 0.55117  0.001 ***
+time           1     39.03  39.028  28.999 0.05072  0.001 ***
+species:time   4     41.22  10.305   7.657 0.05357  0.001 ***
+Residuals    197    265.12   1.346         0.34454           
+Total        206    769.49                 1.00000           
+---
+
+- Among treatment individuals, time and species, again, effects composition but PABD as an added term only affects along (0.015, R2 = 0.007) but not in interactions
+Call:
+adonis(formula = dist(dm.filt.treat) ~ species * time * PABD,      data = mf_treat_without_init_infect_post) 
+
+Permutation: free
+Number of permutations: 999
+
+Terms added sequentially (first to last)
+
+                   Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
+species             4    344.67  86.168  43.631 0.44148  0.001 ***
+time                1     24.55  24.550  12.431 0.03145  0.001 ***
+PABD                1      5.91   5.913   2.994 0.00757  0.015 *  
+species:time        4     28.21   7.052   3.571 0.03613  0.001 ***
+species:PABD        3      6.42   2.140   1.084 0.00822  0.327    
+time:PABD           1      9.80   9.795   4.960 0.01255  0.001 ***
+species:time:PABD   2      5.67   2.835   1.435 0.00726  0.140    
+Residuals         180    355.48   1.975         0.45533           
+Total             196    780.71                 1.00000           
+---
+
+
+- shannon and logRich are visually well-described by a normal distribution
+
+
+- Want to see if richness is changing over time: 
+
+Type I to test for interaction in control group
+Analysis of Variance Table
+
+Response: shannon
+              Df Sum Sq Mean Sq F value Pr(>F)    
+species        4 39.401  9.8503 24.3888 <2e-16 ***
+time           1  1.060  1.0605  2.6256 0.1067    
+species:time   4  2.742  0.6855  1.6973 0.1521    
+Residuals    197 79.565  0.4039                   
+---
+Type II to test for main effects in control group
+Anova Table (Type II tests)
+
+Response: shannon
+          Sum Sq  Df F value    Pr(>F)    
+species   39.598   4 24.1750 2.417e-16 ***
+time       1.060   1  2.5897    0.1091    
+Residuals 82.307 201                      
+---
+
+
+Type I to test for interaction in treatment group
+Analysis of Variance Table
+
+Response: shannon
+              Df  Sum Sq Mean Sq F value    Pr(>F)    
+species        4  29.920  7.4801 12.3760 2.884e-09 ***
+time           1   1.654  1.6539  2.7364   0.09923 .  
+species:time   4  23.685  5.9213  9.7969 2.020e-07 ***
+Residuals    274 165.607  0.6044                      
+---
+
+Type II to test for main effects in treatment group
+Anova Table (Type III tests)
+
+Response: shannon
+             Sum Sq  Df   F value    Pr(>F)    
+(Intercept)  637.40   1 1054.5859 < 2.2e-16 ***
+species       14.19   4    5.8692 0.0001517 ***
+time           0.98   1    1.6290 0.2029166    
+species:time  23.69   4    9.7969  2.02e-07 ***
+Residuals    165.61 274                        
+---
+
+
+RICHNESS
+Type I to test for interaction in control group
+Analysis of Variance Table
+
+Response: logRich
+              Df  Sum Sq Mean Sq F value    Pr(>F)    
+species        4  9.8448 2.46120 17.3532 3.263e-12 ***
+time           1  0.1974 0.19738  1.3916    0.2396    
+species:time   4  0.8054 0.20135  1.4197    0.2288    
+Residuals    197 27.9404 0.14183                      
+---
+Type II to test for main effects in control group
+Anova Table (Type II tests)
+
+Response: logRich
+           Sum Sq  Df F value    Pr(>F)    
+species    9.9684   4 17.4255 2.724e-12 ***
+time       0.1974   1  1.3801    0.2415    
+Residuals 28.7458 201                      
+---
+
+
+
+Type I to test for interaction in treatment group
+Analysis of Variance Table
+
+Response: logRich
+              Df Sum Sq Mean Sq F value    Pr(>F)    
+species        4 11.768 2.94196 18.1367  3.14e-13 ***
+time           1  0.000 0.00048  0.0029 0.9567623    
+species:time   4  3.364 0.84109  5.1852 0.0004847 ***
+Residuals    274 44.446 0.16221                      
+---
+Type III to test for main effects in treatment group
+Anova Table (Type III tests)
+
+Response: logRich
+             Sum Sq  Df   F value    Pr(>F)    
+(Intercept)  916.28   1 5648.7368 < 2.2e-16 ***
+species        2.44   4    3.7548 0.0054249 ** 
+time           0.02   1    0.1238 0.7252123    
+species:time   3.36   4    5.1852 0.0004847 ***
+Residuals     44.45 274                        
+---
+
+Summary [ Note; richness here is same as shannon ]:
+- Species differ in richness, but richness does not change over time in control group. 
+- Richness changes over time doesn't change uniformly when infected, BUT different species change in different ways once infected.
+
+
+BETA DIVERSITY (instability)
+ 
+Type I to test for interaction in control group
+Analysis of Variance Table
+
+Response: distance_bray_curtis
+              Df  Sum Sq  Mean Sq F value    Pr(>F)    
+species        4 0.50309 0.125772  7.6486 1.161e-05 ***
+time           1 0.00416 0.004155  0.2527    0.6159    
+species:time   4 0.05099 0.012746  0.7752    0.5429    
+Residuals    159 2.61456 0.016444                      
+---
+
+Type II to test for main effects in control group
+Anova Table (Type II tests)
+
+Response: distance_bray_curtis
+           Sum Sq  Df F value    Pr(>F)    
+species   0.47511   4  7.2633 2.086e-05 ***
+time      0.00416   1  0.2541    0.6149    
+Residuals 2.66554 163                      
+---
+
+
+Type I to test for interaction in treatment group
+Analysis of Variance Table
+
+Response: distance_bray_curtis
+              Df Sum Sq  Mean Sq F value   Pr(>F)    
+species        4 0.6596 0.164896  6.9084 2.99e-05 ***
+time           1 0.0775 0.077468  3.2455  0.07301 .  
+species:time   4 0.0392 0.009805  0.4108  0.80078    
+Residuals    216 5.1557 0.023869                     
+---
+
+Type II to test for main effects in treatment group
+Anova Table (Type II tests)
+
+Response: distance_bray_curtis
+          Sum Sq  Df F value    Pr(>F)    
+species   0.6256   4  6.6233 4.742e-05 ***
+time      0.0775   1  3.2807   0.07146 .  
+Residuals 5.1949 220                      
+---
+
+Summary:
+- Species differ in their microbiome instability, but this signal is really small relative to noise from sampling effort
+- No effect of time on microbiome instability
+
+
+
+PERCENT INHIBITORY
+
+Type I to compare interactions in control
+Analysis of Deviance Table
+
+Model: binomial, link: logit
+
+Response: percInhib
+
+Terms added sequentially (first to last)
+
+
+             Df Deviance Resid. Df Resid. Dev  Pr(>Chi)    
+NULL                           206     505798              
+species       4    73171       202     432627 < 2.2e-16 ***
+time          1     4778       201     427849 < 2.2e-16 ***
+species:time  4    80748       197     347101 < 2.2e-16 ***
+---
+
+Type III to compare main effects in control
+Analysis of Deviance Table (Type III tests)
+
+Response: percInhib
+             LR Chisq Df Pr(>Chisq)    
+species         81206  4     <2e-16 ***
+time                0  1     0.7259    
+species:time    80748  4     <2e-16 ***
+---
+
+
+Type I to compare interactions in treatment
+
+Analysis of Deviance Table
+
+Model: binomial, link: logit
+
+Response: percInhib
+
+Terms added sequentially (first to last)
+
+
+             Df Deviance Resid. Df Resid. Dev  Pr(>Chi)    
+NULL                           283    1273299              
+species       4   163434       279    1109865 < 2.2e-16 ***
+time          1   107035       278    1002830 < 2.2e-16 ***
+species:time  4    50701       274     952129 < 2.2e-16 ***
+---
+
+
+Type III to compare main effects in treatment
+Analysis of Deviance Table (Type III tests)
+
+Response: percInhib
+             LR Chisq Df Pr(>Chisq)    
+species         42348  4  < 2.2e-16 ***
+time            57575  1  < 2.2e-16 ***
+species:time    50701  4  < 2.2e-16 ***
+---
+
+
+
+
+InhibRich
+
+- Fits a poisson distribution well
+
+Type I to test for interactions in control group
+Analysis of Deviance Table
+
+Model: poisson, link: log
+
+Response: inhibRich
+
+Terms added sequentially (first to last)
+
+
+             Df Deviance Resid. Df Resid. Dev  Pr(>Chi)    
+NULL                           206     232.35              
+species       4  29.2924       202     203.06 6.818e-06 ***
+time          1   0.6686       201     202.39    0.4135    
+species:time  4  31.3583       197     171.03 2.587e-06 ***
+---
+
+Type III test to test main effects in control group
+Analysis of Deviance Table (Type III tests)
+
+Response: inhibRich
+             LR Chisq Df Pr(>Chisq)    
+species        42.494  4  1.318e-08 ***
+time            3.141  1    0.07633 .  
+species:time   31.358  4  2.587e-06 ***
+---
+
+
+
+
+
+Type I to test for interactions in treatment group
+Analysis of Deviance Table
+
+Model: poisson, link: log
+
+Response: inhibRich
+
+Terms added sequentially (first to last)
+
+
+             Df Deviance Resid. Df Resid. Dev  Pr(>Chi)    
+NULL                           283     361.86              
+species       4  130.642       279     231.22 < 2.2e-16 ***
+time          1    0.033       278     231.19  0.856329    
+species:time  4   18.271       274     212.92  0.001092 ** 
+---
+
+Type III test to test for main effects
+Analysis of Deviance Table (Type III tests)
+
+Response: inhibRich
+             LR Chisq Df Pr(>Chisq)    
+species       23.8941  4  8.387e-05 ***
+time           0.7994  1   0.371281    
+species:time  18.2715  4   0.001092 ** 
+---
+
+
+

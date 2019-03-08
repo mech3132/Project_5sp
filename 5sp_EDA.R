@@ -15,8 +15,8 @@ library(gridExtra) # For arranging ggplots
 library(mgcv) # For beta distribution (beta diversity)
 library(vegan) # for permanova
 library(car) # for type III Anova
-
-
+library(RColorBrewer) # colors for barplots
+library(grid) # for text grobs in gridExtra
 #' Define pathways for input files
 
 #### Pathways ####
@@ -41,10 +41,9 @@ dmPWD <- "../beta_div/"
 # distance metrics
 dmMetrics <- c("bray_curtis")
 
-thresh = 1 # number of OTUs in the table for OTU to be kept
-minOTUSample = 5
-minOTUTab = 100
-otuCutoff = 5000 # cutoff to discard sample
+minOTUSample = 5 # min number of reads per sample for the OTU to be non-zero
+minOTUTab = 100 # min number of OTUs found in table for OTU to be kept in table
+otuCutoff = 5000 # cutoff to discard sample; 
 
 
 
@@ -179,10 +178,13 @@ mf <- mf %>% # mapping file with controls still in it
     rename_at(vars(toKeepMF), ~ newNames) %>% #rename variable names
     filter(prepost == "Pre" | prepost == "Pos") %>% # get rid of things in "tre", which is a different experiment
     separate(timepoint, into=c("exposure","time"), sep="_", convert=TRUE) %>% # create a time variable
-    mutate( time = ifelse(exposure == "Pre", time, time + 5)) # time variable "restarts" at BD exposure point, but I want it to be continuous
+    mutate( time = ifelse(exposure == "Pre", time, time + 5)) %>% # time variable "restarts" at BD exposure point, but I want it to be continuous
+    mutate(species=ifelse(species=="Bubo","Anbo",ifelse(species=="Buma","Anma",ifelse(species=="Raca","Lica",ifelse(species=="Rapi","Lipi",species))))) %>%
+    separate(toadID, into=c("todelete","ID"), sep="_",remove=TRUE) %>%
+    unite(toadID, species,ID, sep = "_", remove = FALSE) %>%
+    dplyr::select(-todelete, -ID)
 
-
-#### Adjusting values in mf for Osse and Bubo ####
+#### Adjusting values in mf for Osse and Anbo ####
 
 #' OSSE QUIRK\
 #' \
@@ -197,11 +199,11 @@ mf[addTime1, "time"] <- mf[addTime1, "time"] +1 # add 1 to all pre time points s
 
 #' BUBO QUIRK\
 #' \
-#' Additionally, there is this strange quirk with the Bubo dataset (or rather, strange quirk with every OTHER dataset) where nothing but
-#' Bubo was sampled at time point 10. Thus, let's add +1 to all time point 10's for all samples except Bubo
+#' Additionally, there is this strange quirk with the Anbo dataset (or rather, strange quirk with every OTHER dataset) where nothing but
+#' Anbo was sampled at time point 10. Thus, let's add +1 to all time point 10's for all samples except Anbo
 
-addTime1_notbubo <- which((mf$species!="Bubo") & (mf$time == 15))
-mf[addTime1_notbubo,"time"] <- mf[addTime1_notbubo,"time"] + 1
+addTime1_notanbo <- which((mf$species!="Anbo") & (mf$time == 15))
+mf[addTime1_notanbo,"time"] <- mf[addTime1_notanbo,"time"] + 1
 
 #### filtering mapping files
 mf.wcon <- mf 
@@ -217,15 +219,15 @@ any(table(dplyr::select(mf.tb, toadID, time)) > 1)
 # Oh no! There is a duplicate! Check which one it is.
 #+ message=FALSE, echo=FALSE, warnings=FALSE, include=FALSE
 table(dplyr::select(mf.tb, toadID, time))>1
-# Raca10 has 2 timepoint 3's
-# Buma11 has 2 time point 3's
+# Lica10 has 2 timepoint 3's
+# Anma11 has 2 time point 3's
 # I think this is just a mistake in the data entry. I've gone through the rest of the metadata and determined that 
 #   it is probably mis-labeled so:
 # I'm going to manually change:
-# I think mck115Pre.3Buma.11.452405 Buma11 timepoint 3 is actually Buma9, time 3
-# I think mck105Pre.3Raca.10.451190 Raca10 timepoint 3 is actually Raca9, time 3
-mf.tb[mf.tb$SampleID == "mck115Pre.3Buma.11.452405",c("toadID")] <- "Buma_9"
-mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Raca_9"
+# I think mck115Pre.3Buma.11.452405 Anma11 timepoint 3 is actually Anma9, time 3
+# I think mck105Pre.3Raca.10.451190 Lica10 timepoint 3 is actually Lica9, time 3
+mf.tb[mf.tb$SampleID == "mck115Pre.3Buma.11.452405",c("toadID")] <- "Anma_9"
+mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Lica_9"
 
 #### Adjusting for individuals who were contaminated at the beginning
 
@@ -235,20 +237,20 @@ mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Raca_9"
 #' provided by Val.
 #' 
 
-BD_contam_upon_arrival <- c("Buma_4"
-                            , "Buma_6"
-                            , "Buma_7"
-                            , "Buma_10"
-                            , "Buma_11"
-                            , "Rapi_1"
-                            , "Rapi_2"
-                            , "Rapi_5"
-                            , "Rapi_7"
-                            , "Rapi_8"
-                            , "Rapi_9"
-                            , "Rapi_10"
-                            , "Rapi_11"
-                            , "Rapi_12")
+BD_contam_upon_arrival <- c("Anma_4"
+                            , "Anma_6"
+                            , "Anma_7"
+                            , "Anma_10"
+                            , "Anma_11"
+                            , "Lipi_1"
+                            , "Lipi_2"
+                            , "Lipi_5"
+                            , "Lipi_7"
+                            , "Lipi_8"
+                            , "Lipi_9"
+                            , "Lipi_10"
+                            , "Lipi_11"
+                            , "Lipi_12")
 
 # Add new column for individuals that were originally contamined
 mf.tb$orig_contam <- 0
@@ -423,18 +425,42 @@ mf_treat_without_init_infect <- mf_treat %>%
 save(mf_con_without_init_infect, file="mf_con_without_init_infect.RData")
 save(mf_treat_without_init_infect, file="mf_treat_without_init_infect.RData")
 
-#### PLOTTING EXP DESIGN ####
+#### Make OTU table of JUST inhibitory bacteria ####
+# Should double check this at some point
+temp_char_otu <- otu.tb.inhib %>%
+    dplyr::select(c(OTUID, inhib))
+# Make con and treat with just inhibitory with taxa names
+otu.temp <- t(otu.tb.inhib %>%
+                  dplyr::select(-c(OTUID, inhib)))
+otu.temp <- cbind(t(otu.temp/sampleCounts), temp_char_otu)
 
-# Here, we outline "Control" individuals in white; and show log BD load intensity in blue-scale
+otu.inhibOnly.con <- otu.temp %>%
+    filter(inhib=="inhibitory") %>%
+    dplyr::select(mf_con_without_init_infect$SampleID, "OTUID")
+otu.inhibOnly.treat <- otu.temp %>%
+    filter(inhib=="inhibitory") %>%
+    dplyr::select(mf_treat_without_init_infect$SampleID, "OTUID") 
+
+# save otu tables
+save(otu.inhibOnly.con, file="otu.inhibOnly.con.RData")
+save(otu.inhibOnly.treat, file="otu.inhibOnly.treat.RData")
+
+
+#### PLOTTING EXP DESIGN ####
+#+ fig.height=12, fig.width=5
 mf.rare %>%
     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
+    mutate(Treatment=ifelse(BD_infected=="y","Bd-exposed","Control"), "LnBd_load" = eBD_log) %>%
     ggplot(aes(x=time, y=indiv)) +
-    theme_bw() +
-    geom_tile(aes(group=toadID,col=BD_infected, fill=eBD_log), lwd=0.5)+
-    scale_color_manual(values=c("grey","black")) +
+    geom_line(aes(group=toadID, col=Treatment)) +
+    geom_point(aes(group=toadID,bg=LnBd_load), cex=4, pch=21)+
+    scale_color_manual(values=c("blue","orange")) +
+    scale_fill_gradient(low = "white", high = "red") +
     geom_vline(aes(xintercept=5.5), col="orange")+
-    facet_wrap(~species, nrow=5)
+    facet_wrap(~species, nrow=5) +
+    xlab("Time") +
+    ylab("Individual Toad")
 
 # Here, we show only infected individuals and their BD load; the individuals who were already infected are removed.
 mf_treat_without_init_infect %>%
@@ -451,6 +477,7 @@ mf_treat_without_init_infect %>%
 
 #### PLOTTING BETA PLOTS ####
 
+#+
 # What do different species look like? (Control only)
 mf_con_without_init_infect %>%
     ggplot(aes(x=NMDS1, y=NMDS2)) +
@@ -465,8 +492,9 @@ mf_con_without_init_infect %>%
     geom_point(aes(col=time), cex=3)
 # Filtering dm to include only controls
 dm.filt.con <- dm.filt[mf_con_without_init_infect$SampleID,mf_con_without_init_infect$SampleID ]
-adonis(dist(dm.filt.con) ~ species*time, data=mf_con_without_init_infect)
-#' There is a significant effect of species AND time AND interaction
+save(dm.filt.con, file="dm.filt.con.RData")
+
+#' There is a significant effect of species AND time AND interaction on COMPOSITION
 
 rbind(mf_con_without_init_infect, mf_treat_without_init_infect) %>%
     mutate(BD_infected=ifelse(BD_infected=="y","Treatment","Control")
@@ -486,9 +514,7 @@ mf_treat_without_init_infect %>%
 mf_treat_without_init_infect_post <- mf_treat_without_init_infect %>%
     filter(exposure=="Post")
 dm.filt.treat <- dm.filt[mf_treat_without_init_infect_post$SampleID, mf_treat_without_init_infect_post$SampleID]
-adonis(dist(dm.filt.treat) ~ species*time*PABD, data=mf_treat_without_init_infect_post)
-#' There is a significant effect of species, time, and PABD; all of these things also significantly interact
-#' EXCEPT species and PABD and all 3 together, which suggests species microbiomes change in the "same way" when infected
+save(dm.filt.treat, file="dm.filt.treat.RData")
 
 #### ALPHA DIVERISTY ####
 
@@ -519,59 +545,68 @@ gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=logRich)) +
     geom_line(data=data.frame(x=x.fit.obsotu, y=y.pred.obsotu), aes(x=x, y=y), col="red")
 grid.arrange(gg_shannon_all, gg_obsotu_all, nrow=1)
 
-# gg_shannon <- ggplot(data=mf_con_without_init_infect, aes(x=shannon)) +
-#     geom_histogram(aes(color=species), bins=20, show.legend = FALSE) +
-#     facet_grid(~species) 
-# gg_obsOTUs <- ggplot(data=mf_con_without_init_infect, aes(x=observed_otus)) +
-#     geom_histogram(aes(color=species), bins=20, show.legend = FALSE) +
-#     facet_grid(~species)
-# grid.arrange(gg_shannon, gg_obsOTUs, nrow=2)
-
 # Check to see if turnover is changing with time significantly
 gg_divtime_con <- mf_con_without_init_infect %>%
     filter(!is.na(shannon)) %>%
     ggplot(aes(x=time, y=shannon)) + 
-    # geom_smooth(aes(group=toadID, col=species), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(col=PABD)) +
-    # scale_color_manual(values=c("red","blue","gold","green","purple","black")) +
+    scale_color_manual(values="blue")+
     facet_grid(~species)
 gg_divtime_treat <- mf_treat_without_init_infect %>%
     filter(!is.na(shannon)) %>%
     ggplot(aes(x=time, y=shannon)) + 
-    # geom_smooth(aes(group=toadID, col=species), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
     geom_vline(aes(xintercept=5.5)) +
     facet_grid(~species)
 grid.arrange(gg_divtime_con, gg_divtime_treat, nrow=2)
-Anova(lm(shannon ~ species*time, data=mf_con_without_init_infect), type = 2)
-# There is a significant effect of species on shannon, but not of time in controls
-Anova(lm(shannon ~ species*time, data=mf_treat_without_init_infect), type = 2)
-# There is a significant effect of species, and species:time -- species react differently to infeciton
-# Not all the same!
+
+#' Does diversity change over time in control individuals?
+# Type I ANOVA to test for interaction-- (AB | A, B)
+anova(lm(shannon ~ species*time, data=mf_con_without_init_infect))
+# Use Type II ANOVA (no interaction present)
+Anova(lm(shannon ~ species + time, data=mf_con_without_init_infect), type = 2)
+# There is a significant effect of species but not time or interaction
+
+#' Does richness change over time in treatment individuals?
+# Type I ANOVA to test for interaction (AB | A,B)
+anova(lm(shannon ~ species*time, data=mf_treat_without_init_infect))
+# Type III ANOVA (valid in presence of interaction)
+Anova(lm(shannon ~ species * time, data=mf_treat_without_init_infect, contrasts=list(species=contr.sum)), type=3)
+
 
 gg_richtime_con <- mf_con_without_init_infect %>%
     filter(!is.na(logRich)) %>%
     ggplot(aes(x=time, y=logRich)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_richtime_treat <- mf_treat_without_init_infect %>%
     filter(!is.na(logRich)) %>%
     ggplot(aes(x=time, y=logRich)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
     geom_vline(aes(xintercept=5.5)) +
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 grid.arrange(gg_richtime_con, gg_richtime_treat, nrow=2)
-Anova(lm(logRich ~ species*time, data=mf_con_without_init_infect), type=2)
-# There is a significant effect of species on shannon, but not of time in controls
-Anova(lm(logRich ~ species*time, data=mf_treat_without_init_infect), type = 2)
-# There is a significant effect of species, and species:time or species:prepost-- species react differently to infeciton
-# Not all the same!
+
+#' Does richness change over time in control individuals?
+# Type I ANOVA to test for interaction-- (AB | A, B)
+anova(lm(logRich ~ species*time, data=mf_con_without_init_infect))
+# Use Type II ANOVA (no interaction present)
+Anova(lm(logRich ~ species + time, data=mf_con_without_init_infect), type = 2)
+# There is a significant effect of species but not time or interaction
+
+#' Does richness change over time in treatment individuals?
+# Type I ANOVA to test for interaction (AB | A,B)
+anova(lm(logRich ~ species*time, data=mf_treat_without_init_infect))
+# Type III ANOVA (valid in presence of interaction)
+Anova(lm(logRich ~ species * time, data=mf_treat_without_init_infect, contrasts=list(species=contr.sum)), type=3)
+
 
 #### SHANNON ####
 #' We see that shannon and log of observed otus look approximately normal. Great!
@@ -600,31 +635,27 @@ pre_test_set <- mf_treat_without_init_infect %>%
 ## PLOT OF EXPECTED RCIHNESS FOR EACH SPECIES
 samps_lmer_shannon$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
     gather(key=species, value=shannon) %>%
     ggplot(mapping=aes(x=species, y=shannon))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=shannon, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pre_test_set, aes(y=shannon, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 samp_sigma <- samps_lmer_shannon$aux
 toadID_sigma <- sd(samps_lmer_shannon$b[,ncol(samps_lmer_shannon$b)])
 
-
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals
 treat_indiv <- unique(mf_treat_without_init_infect$toadID)
-# Get distribution for each species
+# List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 
 exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-    exp_distr[,num_sp] <- rnorm(length(samps_lmer_shannon$beta[,num_sp]), mean=rnorm(length(samps_lmer_shannon$beta[,num_sp]), mean=samps_lmer_shannon$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
+    exp_distr[,num_sp] <- rnorm(length(samps_lmer_shannon$beta[,num_sp]), mean=samps_lmer_shannon$beta[,num_sp], sd=toadID_sigma)
 }
 
 # Loop through and calculate probability of having diversity at that level
@@ -662,15 +693,16 @@ pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
 # Plot results 
-ggplot(pre_exp_indiv, aes(x=p_shan, y=log(infect+1))) +
+gg_shan_p <- ggplot(pre_exp_indiv, aes(x=p_shan, y=log(infect+1))) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
     geom_smooth(method=lm, se=FALSE, col="black")
 # if we'd JUST plotted raw values
-ggplot(pre_exp_indiv, aes(x=exp_shan, y=log(infect+1)))+
+gg_shan_raw <- ggplot(pre_exp_indiv, aes(x=exp_shan, y=log(infect+1)))+
     geom_point(aes(color=species), cex=4) +
     geom_smooth(method=lm, se=FALSE) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) 
+grid.arrange(gg_shan_p, gg_shan_raw, nrow=1)
 exp_distr %>%
     gather(key=species, value=shannon) %>%
     ggplot(aes(x=species, y=shannon)) +
@@ -699,30 +731,40 @@ pre_test_set <- mf_treat_without_init_infect %>%
 # Plot of expected by species, and real samples
 samps_lmer_rich$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
     gather(key=species, value=logRich) %>%
     ggplot(mapping=aes(x=species, y=logRich))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=logRich, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pre_test_set, aes(y=logRich, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 samp_sigma <- samps_lmer_rich$aux
 toadID_sigma <- sd(samps_lmer_rich$b[,ncol(samps_lmer_rich$b)])
 
+# Get estimates for control toads
+rich_species_exp <- fixef(lmer_rich)  %>%
+    as_tibble() %>%
+    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+con_toad_est_rich <- ranef(lmer_rich)$toadID %>%
+    rename(sp_est="(Intercept)") %>%
+    mutate(toadID=rownames(ranef(lmer_rich)$toadID)) %>%
+    separate(toadID, into=c("species","num"), sep="_",remove=FALSE) %>%
+    dplyr::select(-num) %>%
+    left_join(rich_species_exp, by = "species") %>%
+    mutate(est_rich=sp_est+value)
+
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals
 treat_indiv <- unique(mf_treat_without_init_infect$toadID)
-# Get distribution for each species
+# List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 
 exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-    exp_distr[,num_sp] <- rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=samps_lmer_rich$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
+    exp_distr[,num_sp] <- rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=samps_lmer_rich$beta[,num_sp], sd=toadID_sigma)
+    # exp_distr[,num_sp] <- rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=samps_lmer_rich$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
 }
 
 # Loop through and calculate probability of having diversity at that level
@@ -742,8 +784,8 @@ for ( i in treat_indiv ) {
         exp_rich <- temp_rich
     }
     
-    pred_distr <- rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=samps_lmer_rich$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
-    p_rich <- sum(pred_distr<exp_rich)/length(pred_distr)
+    # pred_distr <- rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=rnorm(length(samps_lmer_rich$beta[,num_sp]), mean=samps_lmer_rich$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
+    p_rich <- sum(exp_distr[,sp[1]]<exp_rich)/length(exp_distr[,sp[1]])
     
     ### Did they get infected?
     infect <- max(mf_treat_without_init_infect %>%
@@ -755,21 +797,31 @@ for ( i in treat_indiv ) {
     pre_exp_indiv[n_row,c("exp_rich","p_rich","infect")] <- c(exp_rich, p_rich, infect)
     
 }
+
+con_exp_indiv_rich <- data.frame(toadID=con_toad_est_rich$toadID, exp_rich=rep(NA, length(con_toad_est_rich$toadID)), p_rich=rep(NA, length(con_toad_est_rich$toadID)))
+for ( i in 1:nrow(con_toad_est_rich) ) {
+    s <- con_toad_est_rich[i,"species"]
+    
+    exp_rich <- con_toad_est_rich[i,"est_rich"]
+    p_rich <- sum(exp_distr[,s]<exp_rich)/length(exp_distr[,s])
+    
+    con_exp_indiv_rich[i,c("exp_rich","p_rich")] <- c(exp_rich, p_rich)
+}
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
 # Plot results 
-ggplot(pre_exp_indiv, aes(x=p_rich, y=log(infect+1))) +
+gg_logRich_p <- ggplot(pre_exp_indiv, aes(x=p_rich, y=log(infect+1))) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
     geom_smooth(method=lm, se=FALSE, col="black")
 # if we'd JUST plotted raw values
-ggplot(pre_exp_indiv, aes(x=exp_rich, y=log(infect+1)))+
+gg_logRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_rich, y=log(infect+1)))+
     geom_point(aes(color=species), cex=4) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_smooth(method=lm, se=FALSE)
-
+grid.arrange(gg_logRich_p, gg_logRich_raw, nrow=1)
 exp_distr %>%
     gather(key=species, value=logRich) %>%
     ggplot(aes(x=species, y=logRich)) +
@@ -779,6 +831,7 @@ exp_distr %>%
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_rich, p_rich) %>%
     full_join(all_p, by="toadID")
+
 #### BETA DIVERSTY ####
 
 #### Beta plot
@@ -805,23 +858,31 @@ mf_con_without_init_infect %>%
 gg_betatime_con <- mf_con_without_init_infect %>%
     filter(!is.na(distance_bray_curtis)) %>%
     ggplot(aes(x=time, y=distance_bray_curtis)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_betatime_treat <- mf_treat_without_init_infect %>%
     filter(!is.na(distance_bray_curtis)) %>%
     ggplot(aes(x=time, y=distance_bray_curtis)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
     geom_vline(aes(xintercept=5.5))+
     facet_grid(~species)
 grid.arrange(gg_betatime_con, gg_betatime_treat, nrow=2)
+
 # Is there an effect of species and time on controls?
-Anova(lm(distance_bray_curtis ~ species*time, data=mf_con_without_init_infect))
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance_bray_curtis ~ species*time, data=mf_con_without_init_infect))
+# Type II ANOVA with no interaction
+Anova(lm(distance_bray_curtis ~ species + time, data=mf_con_without_init_infect), type = 2)
+
 # Is there an effect of species and time on treatment??
-Anova(lm(distance_bray_curtis ~ species*prepost, data=mf_treat_without_init_infect))
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance_bray_curtis ~ species*time, data=mf_treat_without_init_infect))
+# Type II ANOVA with no interaction
+Anova(lm(distance_bray_curtis ~ species + time, data=mf_treat_without_init_infect), type = 2)
 
 
 #' We see that beta diversity is fairly normal, but we probably want to use a beta distribution since it's continuous and bound between
@@ -876,22 +937,19 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_BC$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    mutate(Bubo=inv_logit(mu(Bubo, samps_glmer_BC$aux))
-           ,Buma=inv_logit(mu(Buma, samps_glmer_BC$aux))
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=inv_logit(mu(Anbo, samps_glmer_BC$aux))
+           ,Anma=inv_logit(mu(Anma, samps_glmer_BC$aux))
            ,Osse=inv_logit(mu(Osse, samps_glmer_BC$aux))
-           ,Raca=inv_logit(mu(Raca, samps_glmer_BC$aux))
-           ,Rapi=inv_logit(mu(Rapi, samps_glmer_BC$aux))) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+           ,Lica=inv_logit(mu(Lica, samps_glmer_BC$aux))
+           ,Lipi=inv_logit(mu(Lipi, samps_glmer_BC$aux))) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=distance_bray_curtis, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pre_test_set, aes(y=distance_bray_curtis, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 # samp_sigma <- sigma(glmer_BC)
 toadID_sigma <- sd(samps_glmer_BC$b[,ncol(samps_glmer_BC$b)])
@@ -900,12 +958,13 @@ phi <- samps_glmer_BC$aux
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals
 treat_indiv <- unique(mf_treat_without_init_infect$toadID)
-# Get distribution for each species
+# List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 
 exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
     mu <- inv_logit(rnorm(4000, mean=samps_glmer_BC$beta[,num_sp], sd=toadID_sigma))
+    # exp_distr[,nump_sp] <- mu
     exp_distr[,num_sp] <- rbeta(length(samps_glmer_BC$beta[,num_sp])
                                 ,shape1=a(mu,samps_glmer_BC$aux)
                                 ,shape2=b(mu,samps_glmer_BC$aux))
@@ -932,17 +991,15 @@ for ( i in treat_indiv ) {
     
     if ( length(temp_bc) > 1) {
         exp_mu <-  fitdistr(temp_bc, "normal")$estimate[1]
+        # exp_mu <-  fitdistr(temp_bc, "beta", start=list(shape1=0.1, shape2=0.1))$estimate[1]
     } else if ( length(temp_bc) == 1) {
         exp_mu <- temp_bc
     } else {
         exp_mu <- NA
     }
     
-    # mu_vec <- rnorm(length(samps_glmer_BC$beta[,num_sp]), mean=samps_glmer_BC$beta[,num_sp], sd=toadID_sigma)
-    # pred_distr <- rbeta(length(samps_glmer_BC$beta[,num_sp]), shape1=a(mu_vec,phi), shape2=b(mu_vec,phi))
-    
     # dm is distance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
-    p_mu <- sum(exp_distr[,sp[1]]<exp_mu, na.rm=TRUE)/length(pred_distr)
+    p_mu <- sum(exp_distr[,sp[1]]<exp_mu, na.rm=TRUE)/length(exp_distr[,sp[1]])
 
     ### Did they get infected?
     infect <- max(mf_treat_without_init_infect %>%
@@ -959,32 +1016,37 @@ pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
 # Plot results 
-pre_exp_indiv %>%
+gg_beta_p <- pre_exp_indiv %>%
     filter(!is.na(exp_mu)) %>%
     ggplot(aes(x=p_mu, y=log(infect+1))) +
     geom_smooth(method=lm, se=FALSE) +
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
     geom_point(aes(color=species), cex=4) 
 # Raw numbers
-pre_exp_indiv %>%
+gg_beta_raw <- pre_exp_indiv %>%
     filter(!is.na(exp_mu)) %>%
     ggplot(aes(x=exp_mu, y=log(infect+1))) +
     geom_smooth(method=lm, se=FALSE) +
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
     geom_point(aes(color=species), cex=4)
-
+grid.arrange(gg_beta_p, gg_beta_raw, nrow=1)
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_mu, p_mu) %>%
     full_join(all_p, by="toadID")
 
 #### PERCENT INHIBITORY ####
-
-x.fit.percInhib
+x.fit.percInhib <- round(seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
+                       , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100), digits = 2)
+percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "beta", start=list(shape1=1, shape2=6))
+# percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "gamma", start=list(shape=1, rate=8))
+y.pred.percInhib <- dbeta(x.fit.percInhib, shape1=percInhib.fit$estimate[1], shape2=percInhib.fit$estimate[2])
+# y.pred.percInhib <- dgamma(x.fit.percInhib, shape=percInhib.fit$estimate[1], rate=percInhib.fit$estimate[2])
 
 mf_con_without_init_infect %>%
     filter(!is.na(percInhib)) %>%
-    ggplot(aes(x=percInhib)) + 
-    geom_histogram(bins=20) 
+    ggplot(aes(y=..density.., x=percInhib)) + 
+    geom_histogram(bins=20) +
+    geom_line(data=data.frame(x=x.fit.percInhib, y=y.pred.percInhib), aes(x=x,y=y), col="red")
 mf_con_without_init_infect %>%
     filter(!is.na(percInhib)) %>%
     ggplot(aes(x=percInhib)) + 
@@ -994,20 +1056,31 @@ mf_con_without_init_infect %>%
 gg_perctime_con <- mf_con_without_init_infect %>%
     filter(!is.na(percInhib)) %>%
     ggplot(aes(x=time, y=percInhib)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_perctime_treat <- mf_treat_without_init_infect %>%
     filter(!is.na(percInhib)) %>%
     ggplot(aes(x=time, y=percInhib)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(col=PABD)) +
     geom_vline(aes(xintercept=5.5))+
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
-
 grid.arrange(gg_perctime_con, gg_perctime_treat, nrow=2)
+
+# Does percent inhibitory change with species or time?
+# Type I ANOVA (to test for interaction) in control group?
+anova(glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n), test = "Chisq")
+# Type III ANOVA (to test for main effects, given interaction) in control group?
+Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n, contrasts=list(species=contr.sum)), type=3)
+
+# Does percent inhibitory change with species or time in treatment group?
+# Type I ANOVA (to test for interaction) in control group?
+anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n), test = "Chisq")
+# Type III ANOVA (to test for main effects, given interaction) in control group?
+Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n, contrasts = list(species=contr.sum)), type=3)
 
 #' We see that beta diversity is fairly normal, but we probably want to use binomial since it's a proportion.
 #' Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable
@@ -1038,13 +1111,13 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_percInhib$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    mutate(Bubo=inv_logit(Bubo)
-           ,Buma=inv_logit(Buma)
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=inv_logit(Anbo)
+           ,Anma=inv_logit(Anma)
            ,Osse=inv_logit(Osse)
-           ,Raca=inv_logit(Raca)
-           ,Rapi=inv_logit(Rapi)) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+           ,Lica=inv_logit(Lica)
+           ,Lipi=inv_logit(Lipi)) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi, Osse) %>%
     gather(key=species, value=percInhib) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
@@ -1059,11 +1132,12 @@ samps_glmer_percInhib$beta %>%
 toadID_sigma <- sd(samps_glmer_percInhib$b[,ncol(samps_glmer_percInhib$b)])
 
 # instead of predicted distr, we get predicted mu 
-# Get distribution for each species
+# List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 # Get predicted distribuion
 mu_exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
+    # mu_exp_distr[,num_sp] <- rbinom(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
     mu_exp_distr[,num_sp] <- rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
 }
 
@@ -1106,14 +1180,15 @@ pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
 # Plot results 
-ggplot(pre_exp_indiv, aes(x=p_pinhib, y=log(infect+1))) +
+gg_percInhib_p <- ggplot(pre_exp_indiv, aes(x=p_pinhib, y=log(infect+1))) +
     geom_smooth(aes(col=species),method=lm, se=FALSE) +
     geom_point(aes(color=species), cex=4)+
     geom_smooth(method=lm, se=FALSE, col="black")
-ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(infect+1)))+
+gg_percInhib_raw <- ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(infect+1)))+
     geom_smooth(aes(col=species),method=lm, se=FALSE) +
     geom_point(aes(color=species), cex=4)+
     geom_smooth(method=lm, se=FALSE, col="black")
+grid.arrange(gg_percInhib_p, gg_percInhib_raw, nrow=1)
 
 mu_exp_distr %>%
     gather(key=species, value=percInhib) %>%
@@ -1128,37 +1203,54 @@ all_p <- pre_exp_indiv %>%
 #### INHIB RICHNESS ####
 
 ### Fit a poisson and log poisson to see fit
-ggplot(data=mf_con_without_init_infect, aes(x=log(inhibRich))) +
-    geom_histogram(aes(color=species), bins=20, show.legend = FALSE) +
-    facet_grid(~species)
+x.fit.inhibRich <- round(seq(0,max((mf_con_without_init_infect$inhibRich), na.rm=TRUE)+sd((mf_con_without_init_infect$inhibRich), na.rm=TRUE), length.out = 100))
+
+inhibRich.fit <- fitdistr((mf_con_without_init_infect$inhibRich), densfun = "Poisson")
+y.pred.inhibRich <- dpois(x.fit.inhibRich, lambda = (inhibRich.fit$estimate[1]))
+
+ggplot(data=mf_con_without_init_infect, aes(x=(inhibRich))) +
+    geom_histogram(aes(y=..density..), bins=20, show.legend = FALSE) +
+    geom_line(data=data.frame(x=(x.fit.inhibRich), y=y.pred.inhibRich), aes(x=x,y=y), col="red")
+
 
 # Check to see if turnover is changing with time significantly
 gg_inhibtime_con <- mf_con_without_init_infect %>%
     filter(!is.na(inhibRich)) %>%
     ggplot(aes(x=time, y=inhibRich)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(col=PABD))+
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_inhibtime_treat <- mf_treat_without_init_infect %>%
     filter(!is.na(inhibRich)) %>%
     ggplot(aes(x=time, y=inhibRich)) + 
-    # geom_smooth(aes(group=toadID), method=loess) +
-    geom_line(aes(group=toadID, col=species)) +
+    geom_line(aes(group=toadID)) +
     geom_point(aes(col=PABD))+
     geom_vline(aes(xintercept=5.5))+
+    scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 grid.arrange(gg_inhibtime_con, gg_inhibtime_treat, nrow=2)
 
+# Does proportion of inhibitory bacteria differ betwen species and time points?
+# Type I ANOVA to test for interactions in control
+anova(glm(inhibRich ~ species*time, data=mf_con_without_init_infect, family=poisson()), test="Chisq")
+# TYpe III ANOVA to test for main effects with interactions in control
+Anova(glm(inhibRich ~ species*time, data=mf_con_without_init_infect, family=poisson(), contrasts=list(species=contr.sum)),type=3)
+
+# Type I ANOVA to test for interactions
+anova(glm(inhibRich ~ species*time, data=mf_treat_without_init_infect, family=poisson()), test="Chisq")
+# TYpe III ANOVA to test for main effects with interactions
+Anova(glm(inhibRich ~ species*time, data=mf_treat_without_init_infect, family=poisson(), contrasts = list(species=contr.sum)),type=3)
 
 if (FALSE) {
-    glmer_inhibRich <- stan_glmer(inhibRich ~ -1 + species + (1|toadID), data=mf_con_without_init_infect
-                           , prior = normal(0, 10, autoscale = TRUE)
-                           , family= poisson(link="log")
-                           , seed = 5423409)
+    glmer_inhibRich <- stan_glmer(inhibRich ~ species + (1|toadID), data=mf_con_without_init_infect
+                                  , prior = normal(0, 10, autoscale = TRUE)
+                                  , family= poisson(link="identity")
+                                  , seed = 5423409)
     save(glmer_inhibRich, file="glmer_inhibRich.RData")
 } else {
     load(file="glmer_inhibRich.RData")
+
 }
 prior_summary(glmer_inhibRich)
 
@@ -1166,31 +1258,48 @@ prior_summary(glmer_inhibRich)
 samps_glmer_inhibRich <- rstan::extract(glmer_inhibRich$stanfit)
 pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<6) 
-samps_glmer_inhibRich$beta %>%
+
+new_samps_beta <- samps_glmer_inhibRich$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    mutate(V0=samps_glmer_inhibRich$alpha[,1]) %>%
+    transmute(Anbo=V0, Anma=V0+V1, Lica=V0+V2, Lipi=V0+V3, Osse=V0+V4) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse)
+new_samps_beta %>% 
     gather(key=species, value=inhibRich) %>%
     ggplot(mapping=aes(x=species, y=inhibRich))+
     geom_violin() +
-    geom_point(data=mf_con_without_init_infect, aes(y=log(inhibRich), x=species), position = position_jitter(width = 0.1, height=0.05), col="blue") +
-    geom_point(data=pre_test_set, aes(y=log(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
+    geom_point(data=mf_con_without_init_infect, aes(y=(inhibRich), x=species), position = position_jitter(width = 0.1, height=0.05), col="blue") +
+    geom_point(data=pre_test_set, aes(y=(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 toadID_sigma <- sd(samps_glmer_inhibRich$b[,ncol(samps_glmer_inhibRich$b)])
+
+# Get estimates for control toads
+inhib_species_exp <- fixef(glmer_inhibRich)  %>%
+    as_tibble() %>%
+    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+inhib_species_exp$value[2:5] <- unlist(c(inhib_species_exp[1,1]+inhib_species_exp[2,1]
+                                         , inhib_species_exp[1,1]+inhib_species_exp[3,1]
+                                         , inhib_species_exp[1,1]+inhib_species_exp[4,1]
+                                         , inhib_species_exp[1,1]+inhib_species_exp[5,1]))
+
+con_toad_est_inhib <- ranef(glmer_inhibRich)$toadID %>%
+    rename(sp_est="(Intercept)") %>%
+    mutate(toadID=rownames(ranef(glmer_inhibRich)$toadID)) %>%
+    separate(toadID, into=c("species","num"), sep="_",remove=FALSE) %>%
+    dplyr::select(-num) %>%
+    left_join(inhib_species_exp, by = "species") %>%
+    mutate(est_inhib=sp_est+value)
 
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals
 treat_indiv <- unique(mf_treat_without_init_infect$toadID)
-# Get distribution for each species
+# List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 
 exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-    exp_distr[,num_sp] <- rnorm(length(samps_glmer_inhibRich$beta[,num_sp]), mean=samps_glmer_inhibRich$beta[,num_sp], sd=toadID_sigma)
+    exp_distr[,num_sp] <- rnorm(length(new_samps_beta[,num_sp]), mean=new_samps_beta[,num_sp], sd=toadID_sigma)
 }
 
 # Loop through and calculate probability of having diversity at that level
@@ -1204,7 +1313,7 @@ for ( i in treat_indiv ) {
         dplyr::select(inhibRich) %>%
         pull()
     if ( length(temp_rich)>1 ) {
-        exp_inhibRich <-  fitdistr(temp_rich, "lognormal")$estimate[1]
+        exp_inhibRich <-  fitdistr((temp_rich), "Poisson")$estimate[1]
         
     } else {
         exp_inhibRich <- log(temp_rich)
@@ -1222,19 +1331,31 @@ for ( i in treat_indiv ) {
     pre_exp_indiv[n_row,c("exp_inhibRich","p_inhibRich","infect")] <- c(exp_inhibRich, p_inhibRich, infect)
     
 }
+
+con_exp_indiv_inhib <- data.frame(toadID=con_toad_est_inhib$toadID, exp_inhibRich=rep(NA, length(con_toad_est_inhib$toadID)), p_inhibRich=rep(NA, length(con_toad_est_inhib$toadID)))
+for ( i in 1:nrow(con_toad_est_inhib) ) {
+    s <- con_toad_est_inhib[i,"species"]
+    
+    exp_rich <- con_toad_est_inhib[i,"est_inhib"]
+    p_rich <- sum(exp_distr[,s]<exp_rich)/length(exp_distr[,s])
+    
+    con_exp_indiv_inhib[i,c("exp_inhibRich","p_inhibRich")] <- c(exp_rich, p_rich)
+}
+
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
 # Plot results 
-ggplot(pre_exp_indiv, aes(x=p_inhibRich, y=log(infect+1))) +
+gg_inhibRich_p <- ggplot(pre_exp_indiv, aes(x=p_inhibRich, y=log(infect+1))) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
     geom_smooth(method=lm, se=FALSE, col="black")
-ggplot(pre_exp_indiv, aes(x=exp_inhibRich, y=log(infect+1))) +
+gg_inhibRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_inhibRich, y=log(infect+1))) +
     geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
     geom_smooth(method=lm, se=FALSE, col="black")
+grid.arrange(gg_inhibRich_p, gg_inhibRich_raw, nrow=1)
 
 exp_distr %>%
     gather(key=species, value=loginhibRich) %>%
@@ -1271,17 +1392,14 @@ post_test_set <- mf_treat_without_init_infect %>%
 ## PLOT OF EXPECTED RCIHNESS FOR EACH SPECIES
 samps_lmer_shannon_all$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
     gather(key=species, value=shannon) %>%
     ggplot(mapping=aes(x=species, y=shannon))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=shannon, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=post_test_set, aes(y=shannon, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon_all)$toadID
-# sp_mu <- fixef(lmer_shannon_all)
 # Get standard deviation between toad individuals and samples
 samp_sigma <- samps_lmer_shannon_all$aux
 toad_intercept <- ranef(lmer_shannon_all)$toadID
@@ -1315,16 +1433,17 @@ for ( r in 1:nrow(pos_exp_indiv)) {
     pos_exp_indiv[r,"p_shan"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"shannon"])/4000
 }
 
-pos_exp_indiv %>%
+gg_shan_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_shan, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15)) +
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-pos_exp_indiv %>%
+gg_shan_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=shannon, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15)) +
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_shan_pos_p, gg_shan_pos_raw, nrow=1)
 
 exp_distr %>%
     gather(key=toadID, value=shannon) %>%
@@ -1354,17 +1473,14 @@ pos_test_set <- mf_treat_without_init_infect %>%
 # Plot of expected by species, and real samples
 samps_lmer_rich_all$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
     gather(key=species, value=logRich) %>%
     ggplot(mapping=aes(x=species, y=logRich))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=logRich, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pos_test_set, aes(y=logRich, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 samp_sigma <- samps_lmer_rich_all$aux
 toad_intercept <- ranef(lmer_rich_all)$toadID
@@ -1397,16 +1513,18 @@ for ( r in 1:nrow(pos_exp_indiv)) {
     pos_exp_indiv[r,"p_rich"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"logRich"])/4000
 }
 
-pos_exp_indiv %>%
+gg_logRich_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_rich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-pos_exp_indiv %>%
+gg_logRich_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=logRich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_logRich_pos_p, gg_logRich_pos_raw, nrow=1)
+
 exp_distr %>%
     gather(key=toadID, value=logRich) %>%
     ggplot(aes(x=toadID, y=logRich)) +
@@ -1456,13 +1574,13 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_BC_all$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    mutate(Bubo=inv_logit(mu(Bubo, samps_glmer_BC_all$aux))
-           ,Buma=inv_logit(mu(Buma, samps_glmer_BC_all$aux))
-           ,Osse=inv_logit(mu(Osse, samps_glmer_BC_all$aux))
-           ,Raca=inv_logit(mu(Raca, samps_glmer_BC_all$aux))
-           ,Rapi=inv_logit(mu(Rapi, samps_glmer_BC_all$aux))) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=inv_logit(mu(Anbo, samps_glmer_BC_all$aux))
+           ,Anma=inv_logit(mu(Anma, samps_glmer_BC_all$aux))
+           ,Lica=inv_logit(mu(Lica, samps_glmer_BC_all$aux))
+           ,Lipi=inv_logit(mu(Lipi, samps_glmer_BC_all$aux))
+           ,Osse=inv_logit(mu(Osse, samps_glmer_BC_all$aux))) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
     geom_violin() +
@@ -1506,16 +1624,18 @@ for ( r in 1:nrow(pos_exp_indiv)) {
     pos_exp_indiv[r,"p_BC"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"distance_bray_curtis"])/4000
 }
 
-pos_exp_indiv %>%
+gg_beta_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_BC, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-pos_exp_indiv %>%
+gg_beta_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=distance_bray_curtis, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
+
 exp_distr %>%
     gather(key=toadID, value=distance_bray_curtis) %>%
     ggplot(aes(x=toadID, y=distance_bray_curtis)) +
@@ -1548,20 +1668,18 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_percInhib_all$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    mutate(Bubo=inv_logit(Bubo)
-           ,Buma=inv_logit(Buma)
-           ,Osse=inv_logit(Osse)
-           ,Raca=inv_logit(Raca)
-           ,Rapi=inv_logit(Rapi)) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=inv_logit(Anbo)
+           ,Anma=inv_logit(Anma)
+           ,Lica=inv_logit(Lica)
+           ,Lipi=inv_logit(Lipi)
+           ,Osse=inv_logit(Osse)) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=percInhib) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pos_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
-
 
 
 # indiv_mu <- ranef(glmer_percInhib_all)$toadID
@@ -1607,16 +1725,17 @@ for ( r in 1:nrow(pos_exp_indiv)) {
 
 
 
-pos_exp_indiv %>%
+gg_percInhib_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_percInhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-pos_exp_indiv %>%
+gg_percInhib_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=percInhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_percInhib_pos_p, gg_percInhib_pos_raw, nrow=1)
 
 mu_exp_distr %>%
     gather(key=toadID, value=percInhib) %>%
@@ -1650,17 +1769,14 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>=6) 
 samps_glmer_inhibRich_all$beta %>%
     as.data.frame() %>%
-    rename(Bubo=V1, Buma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
-    dplyr::select(Bubo,Buma,Osse,Raca,Rapi) %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
     gather(key=species, value=inhibRich) %>%
     ggplot(mapping=aes(x=species, y=inhibRich))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=log(inhibRich), x=species), position = position_jitter(width = 0.1, height=0.05), col="blue") +
     geom_point(data=pos_test_set, aes(y=log(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
-# indiv_mu <- ranef(lmer_shannon)$toadID
-# sp_mu <- fixef(lmer_shannon)
 # Get standard deviation between toad individuals and samples
 samp_intercept <- ranef(glmer_inhibRich_all)$SampleID
 toad_intercept <- ranef(glmer_inhibRich_all)$toadID
@@ -1704,16 +1820,17 @@ for ( r in 1:nrow(pos_exp_indiv)) {
 
 
 
-pos_exp_indiv %>%
+gg_inhibRich_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_inhibRich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-pos_exp_indiv %>%
+gg_inhibRich_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=inhibRich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_inhibRich_pos_p, gg_inhibRich_pos_raw, nrow=1)
 
 exp_distr %>%
     gather(key=toadID, value=inhibRich) %>%
@@ -1730,13 +1847,518 @@ all_p_infected <- pos_exp_indiv %>%
 save(all_p_infected, file="all_p_infected.RData")
 
 
-### Are inhibRich and overall rich correlated?
+#### Are inhibRich and overall rich correlated? ####
+
+# Extract estimates for each control toad and see if inhibitory richness and overall richness is correlated
+con_exp_indiv <- con_exp_indiv_rich %>%
+    full_join(con_exp_indiv_inhib, by="toadID")
+save(con_exp_indiv, file="con_exp_indiv.RData")
 
 all_p %>%
-    separate(toadID, into=c("species","indiv"), remove=FALSE) %>%
-    ggplot(aes(x=exp_rich, y=exp_inhibRich)) +
-    geom_point(aes(col=species), cex=4)
-all_p %>%
-    separate(toadID, into=c("species","indiv"), remove=FALSE) %>%
+    dplyr::select(toadID, exp_rich, p_rich, exp_inhibRich, p_inhibRich) %>%
+    # full_join(con_exp_indiv, by = "toadID") %>%
+    rbind(con_exp_indiv) %>%
+    dplyr::select(p_inhibRich, p_rich, toadID) %>%
+    separate(toadID, into=c("species","n"), remove=FALSE) %>%
     ggplot(aes(x=p_rich, y=p_inhibRich)) +
-    geom_point(aes(col=species), cex=4)
+    geom_point(aes(col=species), cex=3)
+
+# anova(lm(p_inhib ~ p_rich, data=con_exp_indiv))
+
+#### Inhibitory Bacteria ####
+
+#Exact same?
+otu.inhibOnly.con$OTUID == otu.inhibOnly.treat$OTUID
+# Good
+
+# Look at "must abundant" otus
+combined_otu_inhibOnly <- cbind(otu.inhibOnly.con, otu.inhibOnly.treat)[,-(ncol(otu.inhibOnly.con)+ncol(otu.inhibOnly.treat))]
+OTUs_temp <- combined_otu_inhibOnly %>%
+    dplyr::select(OTUID) %>%
+    mutate(taxa = (inhib.tb[match(OTUID, inhib.tb$seq),"taxa"])$taxa ) 
+    
+OTUs_temp[order(combined_otu_inhibOnly %>%
+                    dplyr::select(-OTUID) %>%
+                    rowSums(.), decreasing = TRUE),]
+
+# chosen colors
+brewer.pal.info
+set.seed(8984)
+set_col <- unique(c(brewer.pal(12,"Set3"), brewer.pal(8,"Spectral"), brewer.pal(8,"Dark2"), brewer.pal(8,"Accent")))
+set_col <- set_col[c(1,35,34,3,33,4,5,30,7,29,8,28,9,27,26,10,11,25,12,24,13,23,14,22,15,21,16,20,17,19,18)]
+
+#### CONTROL ####
+# Going to leave zeros in for now, bc only 3-5 in each control and con
+temp <- otu.inhibOnly.con %>%
+    dplyr::select(-c(OTUID)) %>%
+    unlist()
+# THE ABOVE LISTS BY STACKING COL ON TOP OF EACH OTHER (not by stacking rows beside each other)
+
+otu_long_con <- cbind(rep(colnames(otu.inhibOnly.con)[-ncol(otu.inhibOnly.con)], each=nrow(otu.inhibOnly.con))
+                        ,temp
+                        ,rep(otu.inhibOnly.con$OTUID,times=ncol(otu.inhibOnly.con)-1)) %>%
+    as_tibble() %>%
+    rename(SampleID=V1, reads=temp, OTUID=V2) %>%
+    mutate(reads=as.numeric(reads))
+mf_con_with_inhibOTUs <- mf_con_without_init_infect %>%
+    dplyr::select(SampleID, species, time, toadID, eBD_log, PABD, prepost, BD_infected) %>%
+    left_join(otu_long_con) %>%
+    mutate(taxa = (inhib.tb[match(OTUID, inhib.tb$seq),"taxa"])$taxa ) %>%
+    separate(taxa, into = c("K","P","C","O","F","G"), sep = ";", remove = FALSE, fill="left")
+
+mf_con_with_inhibOTUs %>%
+    group_by(toadID, time, species, G) %>%
+    summarise(AverageProportion = mean(reads)) %>%
+    ggplot(aes(x=time, y=AverageProportion)) +
+    geom_bar(aes(fill=G), stat="identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.key.size =  unit(0.2, "cm") ) +
+    facet_wrap(~species, nrow=2) +
+    scale_fill_manual(values=set_col)
+
+
+#### TREATMENT ####
+# Going to leave zeros in for now, bc only 3-5 in each control and treatment
+temp <- otu.inhibOnly.treat %>%
+    dplyr::select(-OTUID) %>%
+    unlist()
+# THE ABOVE LISTS BY STACKING COL ON TOP OF EACH OTHER (not by stacking rows beside each other)
+
+otu_long_treat <- cbind(rep(colnames(otu.inhibOnly.treat)[-ncol(otu.inhibOnly.treat)], each=nrow(otu.inhibOnly.treat))
+                        ,temp
+                        ,rep(otu.inhibOnly.treat$OTUID,times=ncol(otu.inhibOnly.treat)-1)) %>%
+    as_tibble() %>%
+    rename(SampleID=V1, reads=temp, OTUID=V2) %>%
+    mutate(reads=as.numeric(reads))
+mf_treat_with_inhibOTUs <- mf_treat_without_init_infect %>%
+    dplyr::select(SampleID, species, time, toadID, eBD_log, PABD, prepost, BD_infected) %>%
+    left_join(otu_long_treat)%>%
+    mutate(taxa = (inhib.tb[match(OTUID, inhib.tb$seq),"taxa"])$taxa ) %>%
+    separate(taxa, into = c("K","P","C","O","F","G"), sep = ";", remove = FALSE, fill="left")
+
+mf_treat_with_inhibOTUs %>%
+    group_by(toadID, time, species, G) %>%
+    summarise(AverageProportion = mean(reads)) %>%
+    ggplot(aes(x=time, y=AverageProportion)) +
+    geom_bar(aes(fill=G), stat="identity") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.key.size =  unit(0.2, "cm") ) +
+    facet_wrap(~species, nrow=2) +
+    scale_fill_manual(values=set_col) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2)
+
+g_legend <- function(a.gplot){ # from stack overflow
+    tmp <- ggplot_gtable(ggplot_build(a.gplot)) 
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+    legend <- tmp$grobs[[leg]] 
+    return(legend)} 
+
+### Goal: plot abundance of inhibitory bacteria over time for each individual of each species
+anbo_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Anbo") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Anbo") +
+    xlab("")
+anma_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Anma") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Anma")+
+    xlab("")
+lica_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Lica") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Lica")+
+    xlab("")
+lipi_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Lipi") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Lipi")+
+    xlab("")
+osse_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Osse") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Osse")+
+    xlab("")
+lay_con <- rbind(c(1,1,1,1)
+                 ,c(2,2,2,6)
+                 ,c(3,3,3,3)
+                 , c(4,4,7,7)
+                 , c(5,5,5,5))
+grid.arrange(anbo_con, anma_con, lica_con, lipi_con, osse_con
+             , layout_matrix=lay_con
+             , left = textGrob("Average proportion of reads", rot = 90, vjust = 1)
+             , bottom = textGrob("Time", vjust=1))
+
+
+# Now for treatment 
+### Goal: plot abundance of inhibitory bacteria over time for each individual of each species
+anbo_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Anbo") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Anbo") +
+    xlab("")
+anma_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Anma") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Anma") +
+    xlab("")
+lica_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Lica") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Lica") +
+    xlab("")
+lipi_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Lipi") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Lipi") +
+    xlab("")
+osse_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Osse") %>%
+    group_by(species, toadID, G, time) %>%
+    summarise(reads=mean(reads)) %>%
+    ggplot(aes(x=time, y=reads)) +
+    geom_line(aes(col=G), stat = "identity", show.legend = FALSE) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    facet_wrap(~toadID, nrow=1) +
+    scale_fill_manual(values=set_col) + 
+    scale_color_manual(values=set_col) + 
+    ylab("Osse") +
+    xlab("")
+lay_treat <- rbind(c(1,1,1,1,1,1)
+                 ,c(2,2,2,6,6,6)
+                 ,c(3,3,3,3,3,3)
+                 , c(4,7,7,7,7,7)
+                 , c(5,5,5,5,5,5))
+grid.arrange(anbo_treat, anma_treat, lica_treat, lipi_treat, osse_treat
+             , layout_matrix=lay_treat
+             , left = textGrob("Average proportion of reads", rot = 90, vjust = 1)
+             , bottom = textGrob("Time", vjust=1))
+
+
+### Summraizing before and after exposure ####
+
+# CONTROL 
+mf_con_statdiff <- mf_con_with_inhibOTUs %>%
+    group_by(toadID, species, prepost, G) %>%
+    summarize(meanReads=mean(reads), meanBd = mean(eBD_log)) %>%
+    dplyr::select(-meanBd) %>%
+    spread(key=prepost, value=meanReads) %>%
+    mutate(fc=log((Pos-Pre)/Pre +1), significant = NA, p=NA) %>%
+    mutate(temp= ifelse(is.finite(fc), fc, ifelse(is.infinite(fc), 10, 0)))
+
+#+ warning=FALSE, message=FALSE
+allInhibTaxa <- unique(mf_con_with_inhibOTUs$G)
+allIndiv <- unique(mf_con_with_inhibOTUs$toadID)
+for ( inhib in allInhibTaxa) {
+    # inhib <- allInhibTaxa[1]
+    # inhib <- "Arthrobacter"
+    for ( indiv in allIndiv) {
+        if (exists("stat_temp")) {
+            remove(stat_temp)
+        }
+        # indiv <- allIndiv[1]
+        # indiv <- "Anbo_2"
+        mf_temp <- mf_con_with_inhibOTUs %>%
+            filter(G==inhib, toadID==indiv) %>%
+            group_by(toadID, G, prepost, time) %>%
+            summarise(reads=mean(reads)) %>%
+            spread(key=prepost, value=reads)
+        # stat_temp <- anova(lm(reads ~ prepost, data=mf_temp))
+        #+ warning=FALSE, message=FALSE
+        stat_temp <- wilcox.test(mf_temp$Pre, mf_temp$Pos)
+        mf_con_statdiff[which(mf_con_statdiff$toadID==indiv & mf_con_statdiff$G == inhib),"p"] <- (stat_temp$p.value)
+        mf_con_statdiff[which(mf_con_statdiff$toadID==indiv & mf_con_statdiff$G == inhib),"significant"] <- (stat_temp$p.value<0.05)
+        
+    }
+}
+
+mf_con_statdiff %>%
+    filter(!is.na(significant)) %>%
+    ggplot(aes(x=G)) +
+    geom_point(aes(y=temp, col=species, pch=significant), cex=2, position=position_jitter(width=0, height=0.25)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_shape_manual(values=c(21,19)) +
+    geom_hline(aes(yintercept=0))
+
+
+# TREAT
+
+mf_treat_statdiff <- mf_treat_with_inhibOTUs %>%
+    group_by(toadID, species, prepost, G) %>%
+    summarize(meanReads=mean(reads), meanBd = mean(eBD_log)) %>%
+    dplyr::select(-meanBd) %>%
+    spread(key=prepost, value=meanReads) %>%
+    # mutate(diff=Pos-Pre, significant = NA, p=NA) %>%
+    mutate(fc=log((Pos-Pre)/Pre +1), significant = NA, p=NA) %>%
+    mutate(temp= ifelse(is.finite(fc), fc, ifelse(is.infinite(fc), 10, 0)))
+
+#+ warning=FALSE, message=FALSE
+allInhibTaxa <- unique(mf_treat_with_inhibOTUs$G)
+allIndiv <- unique(mf_treat_with_inhibOTUs$toadID)
+for ( inhib in allInhibTaxa) {
+    # inhib <- allInhibTaxa[1]
+    # inhib <- "Arthrobacter"
+    for ( indiv in allIndiv) {
+        if (exists("stat_temp")) {
+            remove(stat_temp)
+        }
+        # indiv <- allIndiv[1]
+        # indiv <- "Anbo_2"
+        mf_temp <- mf_treat_with_inhibOTUs %>%
+            filter(G==inhib, toadID==indiv) %>%
+            group_by(toadID, G, prepost, time) %>%
+            summarise(reads=mean(reads)) %>%
+            spread(key=prepost, value=reads)
+        # stat_temp <- anova(lm(reads ~ prepost, data=mf_temp))
+        #+ warning=FALSE, message=FALSE
+        stat_temp <- wilcox.test(mf_temp$Pre, mf_temp$Pos)
+        mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"p"] <- (stat_temp$p.value)
+        mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"significant"] <- (stat_temp$p.value<0.05)
+        
+    }
+}
+
+mf_treat_statdiff %>%
+    filter(!is.na(significant)) %>%
+    ggplot(aes(x=G)) +
+    geom_point(aes(y=temp, col=species, pch=significant), cex=2, position=position_jitter(width=0, height=0.25)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_shape_manual(values=c(21,19)) +
+    geom_hline(aes(yintercept=0))
+
+
+### TEsting presence absence BD
+
+# TREAT
+mf_treat_statdiff <- mf_treat_with_inhibOTUs %>%
+    filter(prepost=="Pre" | (prepost == "Pos" & PABD == TRUE)) %>%
+    group_by(toadID, species, prepost, G) %>%
+    summarize(meanReads=mean(reads), meanBd = mean(eBD_log)) %>%
+    dplyr::select(-meanBd) %>%
+    spread(key=prepost, value=meanReads) %>%
+    # mutate(diff=Pos-Pre, significant = NA, p=NA) %>%
+    mutate(fc=log((Pos-Pre)/Pre +1), significant = NA, p=NA) %>%
+    mutate(temp= ifelse(is.finite(fc), fc, ifelse(is.infinite(fc), 10, 0)))
+
+#+ warning=FALSE, message=FALSE
+allInhibTaxa <- unique(mf_treat_with_inhibOTUs$G)
+allIndiv <- unique(mf_treat_with_inhibOTUs$toadID)
+for ( inhib in allInhibTaxa) {
+    # inhib <- allInhibTaxa[1]
+    # inhib <- "Flavobacterium"
+    for ( indiv in allIndiv) {
+        if (exists("stat_temp")) {
+            remove(stat_temp)
+        }
+        # indiv <- allIndiv[1]
+        # indiv <- "Lipi_3"
+        mf_temp <- mf_treat_with_inhibOTUs %>%
+            filter(prepost=="Pre" | (prepost == "Pos" & PABD == TRUE)) %>%
+            filter(G==inhib, toadID==indiv) %>%
+            group_by(toadID, G, prepost, time) %>%
+            summarise(reads=mean(reads)) %>%
+            spread(key=prepost, value=reads)
+        # stat_temp <- anova(lm(reads ~ prepost, data=mf_temp))
+        if ( any(!is.na(mf_temp$Pre)) & any(!is.na(mf_temp$Pos)) ) {
+            #+ warning=FALSE, message=FALSE
+            stat_temp <- wilcox.test(mf_temp$Pre, mf_temp$Pos)
+            mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"p"] <- (stat_temp$p.value)
+            mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"significant"] <- (stat_temp$p.value<0.05)
+        } else {
+            mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"p"] <- NA
+            mf_treat_statdiff[which(mf_treat_statdiff$toadID==indiv & mf_treat_statdiff$G == inhib),"significant"] <- NA        
+            }
+        
+        
+    }
+}
+
+mf_treat_statdiff %>%
+    # filter(!is.na(significant)) %>%
+    ggplot(aes(x=G)) +
+    geom_point(aes(y=temp, col=species, pch=significant), cex=2, position=position_jitter(width=0, height=0.25)) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+    scale_shape_manual(values=c(21,19)) +
+    geom_hline(aes(yintercept=0))
+
+
+
+# mf_treat_with_inhibOTUs %>%
+#     ggplot(aes(x=time, y=reads)) +
+#     geom_bar(aes(fill=G), stat="identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.key.size =  unit(0.2, "cm") ) +
+#     facet_wrap(~species, nrow=2) +
+#     scale_fill_manual(values=set_col) +
+#     geom_vline(aes(xintercept=5.5), col="grey", lty=2)
+
+# mf_con_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Anbo") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10) +
+#     scale_fill_manual(values=set_col)
+
+
+
+
+# mf_con_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Anma") %>%
+#     # unite(Sample, c(toadID,time), remove=FALSE) %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10) +
+#     scale_fill_manual(values=set_col)
+# 
+# mf_con_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Osse") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10) +
+#     scale_fill_manual(values=set_col)
+# 
+# mf_con_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Lica") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10) +
+#     scale_fill_manual(values=set_col)
+# 
+# mf_con_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Lipi") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10)+
+#     scale_fill_manual(values=set_col) 
+
+
+
+
+# 
+# mf_treat_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Anbo") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10) +
+#     scale_fill_manual(values=set_col)
+# 
+# mf_treat_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Anma") %>%
+#     # unite(Sample, c(toadID,time), remove=FALSE) %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10)+
+#     scale_fill_manual(values=set_col)
+# 
+# mf_treat_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Osse") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10)+
+#     scale_fill_manual(values=set_col)
+# 
+# mf_treat_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Lica") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10)+
+#     scale_fill_manual(values=set_col)
+# 
+# mf_treat_with_inhibOTUs %>%
+#     group_by(G, toadID, time, species) %>%
+#     summarize(aveReads = mean(reads)) %>%
+#     filter(species=="Lipi") %>%
+#     ggplot(aes(x=time, y=aveReads)) +
+#     geom_bar(aes(fill=G), stat = "identity") +
+#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+#     facet_wrap(~toadID, nrow=10)+
+#     scale_fill_manual(values=set_col)
+
+
