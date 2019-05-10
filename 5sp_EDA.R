@@ -9,7 +9,7 @@
 #' ## First, load required packages\
 #### Load packages ####
 library(tidyverse) # for data manipulation
-library(MASS) # For fitting distributions
+library(MASS) # For fitting distributions and NMDS
 library(rstanarm) # For calculated expected alpha and beta diversity
 library(gridExtra) # For arranging ggplots
 library(mgcv) # For beta distribution (beta diversity)
