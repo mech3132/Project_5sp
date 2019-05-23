@@ -74,7 +74,21 @@ inhib <- read.delim(paste0(inhibPWD), header=FALSE, as.is=TRUE)
 #' One of the problems with the BD qPCR results is that we get very irregular results. Thus, each individual measurement
 #' is unreliable. Here, I use a parameterized model to predict the "true" Bd load given the measurements taken.
 #'  I would expect BD load to be modelled by an approximately poisson process; here, we check if this is true.
-
+#'  \
+#'  \
+#'  A poisson distribution models a process where there is an expected "distance" or "time" between events, 
+#'  and you want to model how many events occur in a certain "distance" or "timespan". In the Bd system, an approximately
+#'  equal amount of Bd is applied to each individual, and we measure the intensity of Bd through qPCR of a Bd-specific amplicon.
+#'  One of the assumptions of the poisson distribution is that events are independent, and that the probability for an event over short
+#'  intervals is the same as over long intervals. The Bd intensity is bound by zero, and has a hypothetical upper limit since after a
+#'  certain infeciton intensity, amphibians will die. Lambda (the rate at which an event occurs) can be thought of as the number of Bd amplicons
+#'  per "unit" area. In our methods, we assume that we swab all individuals equally. Thus, the "area swabbed" is
+#'  the same across all individual amphibians. The Bd load is thus essentially a measurement of how many "events" there are in an unknown
+#'  swabbing area. While samples of the sample individual over time violate one of the assumptions of the Poisson distribution,
+#'  we are simply using all the samples to see (roughly) whether a poisson distribution is a good fit for the Bd intensity. We then
+#'  use multiple qPCR results from ONE sample to estimate the "true" intensity of Bd on an individual sample. The poisson model
+#'  is therefore not really modelling Bd infection, per say, but rather the accuracy of the qPCR process.
+#'  
 # Filter out all information except BD-positive scenarios
 BD <- mf %>%
     as_tibble() %>%
@@ -138,7 +152,7 @@ BD_alt$infected <- rowSums(BD_alt) >0
 cbind(final_BD[,c("Bd_Run_1","Bd_Run_2","Bd_Average_Run_3","pval","sig")], alt_infect =BD_alt$infected)
 
 #' What we see is that by using a significant threshold of p=0.1 (which is fairly relaxed), the poisson model method is less stringent
-#' than the straight threshold method. I believe the poisson model method is likely more reliable since it is able to detect cases where infeciton
+#' than the straight threshold method. I believe the poisson model method is likely more reliable since it is able to detect cases where infection
 #' is truely low, but consistent. For example, there are some cases where all 3/3 samples were BD-positive but at low abundances; however, the
 #' straight threshold model does not recognize it as a 'positive' since the abundances are below the individual threshold. I believe the poisson model
 #' method uses more of the information in the qPCR methods than the straight threshold method.\
@@ -292,12 +306,12 @@ otu.filt <- otu %>%
     dplyr::select(-rowsums) 
 # Samples to keep in otu table (rarefied)
 OTU_names_rare <- otu_rare$X.OTU.ID
-otu.filt_rare <- otu %>%
+otu.filt_rare <- otu_rare %>%
     as_tibble() %>%
     dplyr::select(one_of(keepSamples)) %>% # Use rare
     replace(.<minOTUSample, 0) %>%
     mutate(rowsums=rowSums(.)) %>%
-    mutate(OTUID = OTU_names) %>%
+    mutate(OTUID = OTU_names_rare) %>%
     filter(rowsums > minOTUTab) %>%
     dplyr::select(-rowsums) 
 # View(otu.filt_rare)
@@ -306,36 +320,10 @@ ncol(otu.filt_rare)
 ncol(otu.filt)
 
 
-#### The mapping file already has diversity in it, so I need to add beta diversity and inihibitory bacterial diversity
 
-##### Beta diversity turnover #####
-# Get distance to sample directly before for every sample
-# AKA: How similar was the current sample to the sample JUST before that time point for that individual toad?
-# Note; tried to do this with dplyr but it is VERY slow. Just used base R subsetting instead
+#### The mapping file already has diversity in it, so I need to add inihibitory bacterial diversity and beta diversity
 
-for ( name in names(dm_all) ) {
-    mf.raw[,paste0("distance_",name)] <- NA
-    dm <- dm_all[[name]]
-    dm <- data.frame(dm, row.names = 1)
-    for ( i in 1:nrow(mf.raw) ) {
-        currentSample <- mf.raw$SampleID[i]
-        current <- mf.raw[i, c("toadID","time")]
-        prevSample <- mf.raw$SampleID[mf.raw$toadID==as.character(current[1,1]) & mf.raw$time == as.numeric(current[1,2]-1)]
-        if ( length(prevSample) > 0 & (currentSample %in% rownames(dm))) {
-            distTemp <- dm[currentSample,as.character(prevSample)]
-            if ( length(distTemp) > 0) {
-                mf.raw[i,paste0("distance_",name)] <- distTemp
-                
-            }
-        }
-        
-        # print(paste0("done",i," out of ",nrow(mf.tb)))
-    }
-}
-
-## 
-
-
+#### Inhibitory bacteria ####
 ### Get proportion and count of inhibitory otus from inhibitory otu metadata
 inhib.tb <- inhib %>%
     as_tibble() %>%
@@ -364,10 +352,68 @@ mf.raw <- mf.raw %>%
            ,inhibCounts =inhibCounts[match(SampleID, names(inhibCounts))]
            , inhibRich=inhibRich[match(SampleID, names(inhibRich))]) %>%
     mutate(percInhib = inhibCounts/n)
+
+
+##### Beta diversity turnover #####
+#' Get distance to sample directly before for every sample
+#' AKA: How similar was the current sample to the sample JUST before that time point for that individual toad?
+#' This is different from beta DISPERSION. In cases where there is no sample before that sample, I omit it using NA
+#' The distance from the previous sample is also done BEFORE I filter for "contaminated" individuals-- but this should
+#' not matter because it is only dependent on the same indivdiual and all of those will be filtered out when we get rid of Bd contaminated individuals.
+# Note; tried to do this with dplyr but it is VERY slow. Just used base R subsetting instead
+
+for ( name in names(dm_all) ) {
+    mf.raw[,paste0("distance_",name)] <- NA
+    dm <- dm_all[[name]]
+    dm <- data.frame(dm, row.names = 1)
+    for ( i in 1:nrow(mf.raw) ) {
+        currentSample <- mf.raw$SampleID[i]
+        current <- mf.raw[i, c("toadID","time")]
+        prevSample <- mf.raw$SampleID[mf.raw$toadID==as.character(current[1,1]) & mf.raw$time == as.numeric(current[1,2]-1)]
+        if ( length(prevSample) > 0 & (currentSample %in% rownames(dm))) {
+            distTemp <- dm[currentSample,as.character(prevSample)]
+            if ( length(distTemp) > 0) {
+                mf.raw[i,paste0("distance_",name)] <- distTemp
+                
+            }
+        }
+        
+        # print(paste0("done",i," out of ",nrow(mf.tb)))
+    }
+}
+
+## 
+##### Beta dispersion #####
+
+#' Another aspect of beta diversity that might change between species and individuals is the dispersion of 
+#' an individual relative to all other individuals. That is, how much different is an individual from the centroid 
+#' of all samples at that time point of that species?
+#' 
 # Now, filter mf to rarefied OTU table
 mf.rare <- mf.raw %>%
     filter(SampleID %in% colnames(otu_rare))
 
+distance.to.centroids <- vector()
+for ( sp in levels(factor(mf.rare$species))) {
+    current.samps <- mf.rare %>%
+        filter(species==sp) %>%
+        dplyr::select(SampleID) %>%
+        pull()
+    current.dm <- dm_all$bray_curtis %>%
+        filter(X %in% current.samps) %>%
+        dplyr::select(one_of(c("X",current.samps)))
+    current.mf <- mf.rare %>%
+        filter(SampleID %in% current.samps)
+    # Same order?
+    # colnames(current.dm)[-1] == current.mf$SampleID
+    # There might be a warning that we are missing certain samples-- this is fine.
+    disp.temp <- betadisper(dist(data.frame(current.dm, row.names = 1)), group = (current.mf$time), type = "centroid")
+    distance.to.centroids <- c(distance.to.centroids, disp.temp$distances)
+}
+
+# add to mf.rare and mf.raw
+mf.rare$distance.to.centroid <- data.frame(distance.to.centroids)[match(mf.rare$SampleID, rownames(data.frame(distance.to.centroids))),]
+mf.raw$distance.to.centroid <- data.frame(distance.to.centroids)[match(mf.raw$SampleID, rownames(data.frame(distance.to.centroids))),]
 
 #### Adding NMDS ####
 # MAKE NMDS
@@ -447,31 +493,35 @@ save(otu.inhibOnly.treat, file="otu.inhibOnly.treat.RData")
 
 
 #### PLOTTING EXP DESIGN ####
+
+
 #+ fig.height=12, fig.width=5
 mf.rare %>%
     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
     mutate(Treatment=ifelse(BD_infected=="y","Bd-exposed","Control"), "LnBd_load" = eBD_log) %>%
+    mutate(Contaminated = factor(ifelse(orig_contam ==1, "!Contaminated upon arrival",NA), levels=c("!Contaminated upon arrival"))) %>%
     ggplot(aes(x=time, y=indiv)) +
     geom_line(aes(group=toadID, col=Treatment)) +
     geom_point(aes(group=toadID,bg=LnBd_load), cex=4, pch=21)+
-    scale_color_manual(values=c("blue","orange")) +
+    scale_color_manual(values=c("black","blue","orange")) +
     scale_fill_gradient(low = "white", high = "red") +
     geom_vline(aes(xintercept=5.5), col="orange")+
+    geom_point(aes(group=toadID, col=Contaminated), cex=1, pch=19)+ ## NEW LINE
     facet_wrap(~species, nrow=5) +
     xlab("Time") +
     ylab("Individual Toad")
-
-# Here, we show only infected individuals and their BD load; the individuals who were already infected are removed.
-mf_treat_without_init_infect %>%
-    separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
-    mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
-    ggplot(aes(x=time, y=indiv)) +
-    theme_bw() +
-    geom_tile(aes(group=toadID,fill=eBD_log), lwd=0.5)+
-    scale_color_manual(values=c("grey","black")) +
-    geom_vline(aes(xintercept=5.5), col="orange")+
-    facet_wrap(~species, nrow=5)
+# 
+# # Here, we show only infected individuals and their BD load; the individuals who were already infected are removed.
+# mf_treat_without_init_infect %>%
+#     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
+#     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
+#     ggplot(aes(x=time, y=indiv)) +
+#     theme_bw() +
+#     geom_tile(aes(group=toadID,fill=eBD_log), lwd=0.5)+
+#     scale_color_manual(values=c("grey","black")) +
+#     geom_vline(aes(xintercept=5.5), col="orange")+
+#     facet_wrap(~species, nrow=5)
 
 # What we learn is that no control individuals were infected at any point, after removing "pre-infected" individuals"
 
@@ -493,6 +543,11 @@ mf_con_without_init_infect %>%
 # Filtering dm to include only controls
 dm.filt.con <- dm.filt[mf_con_without_init_infect$SampleID,mf_con_without_init_infect$SampleID ]
 save(dm.filt.con, file="dm.filt.con.RData")
+
+
+adonis2(dm.filt.con ~ species:time, data=mf_con_without_init_infect, by="margin")
+adonis2(dm.filt.con ~ species + time + species:time, data=mf_con_without_init_infect, by="margin")
+
 
 #' There is a significant effect of species AND time AND interaction on COMPOSITION
 
@@ -619,6 +674,7 @@ Anova(lm(logRich ~ species * time, data=mf_treat_without_init_infect, contrasts=
 #' where i = sample, j = individual, sp = species
 #' Below, we use the dataset with JUST the controls.
 
+# There was no effect of time
 if ( FALSE ) {
     lmer_shannon <- stan_lmer(shannon ~ -1 + species + (1|toadID), data=mf_con_without_init_infect
                               , prior = normal(0, 10, autoscale = TRUE)
@@ -834,6 +890,196 @@ all_p <- pre_exp_indiv %>%
 
 #### BETA DIVERSTY ####
 
+#### Dispersion ####
+#### Beta plot
+# First, fit a beta distribution
+x.fit.dist <- seq(min(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)-sd(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)
+                  , max(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)+sd(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)
+                  , length.out = 100)
+dist.fit <- fitdistr(mf_con_without_init_infect$distance.to.centroid[!is.na(mf_con_without_init_infect$distance.to.centroid)]
+                     , densfun="Gamma")
+y.pred.dist <- dgamma(x.fit.dist, shape = dist.fit$estimate[1], rate = dist.fit$estimate[2])
+# Try a normal too?
+dist.fit.norm <- fitdistr(log(mf_con_without_init_infect$distance.to.centroid[!is.na(mf_con_without_init_infect$distance.to.centroid)])
+                          , densfun="Normal")
+y.pred.dist.norm <- dnorm(x.fit.dist, mean = dist.fit.norm$estimate[1], sd = dist.fit.norm$estimate[2])
+
+mf_con_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=log(distance.to.centroid))) + 
+    geom_histogram(aes(y=..density..), bins=25) +
+    # geom_line(data=data.frame(x=x.fit.dist, y=y.pred.dist), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.fit.dist, y=y.pred.dist.norm), aes(x=x, y=y), col="blue") 
+
+#' Gamma fits better.
+#' 
+# Check to see if turnover is changing with time significantly
+gg_disttime_con <- mf_con_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=time, y=distance.to.centroid)) + 
+    geom_line(aes(group=toadID)) +
+    geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
+    facet_grid(~species)
+gg_disttime_treat <- mf_treat_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=time, y=distance.to.centroid)) + 
+    geom_line(aes(group=toadID)) +
+    geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
+    geom_vline(aes(xintercept=5.5))+
+    facet_grid(~species)
+grid.arrange(gg_disttime_con, gg_disttime_treat, nrow=2)
+
+# Is there an effect of species and time on controls?
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance.to.centroid ~ species*time, data=mf_con_without_init_infect))
+# Type II ANOVA with no interaction
+Anova(lm(distance.to.centroid ~ species + time, data=mf_con_without_init_infect), type = 2)
+
+# Is there an effect of species and time on treatment??
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance_bray_curtis ~ species*time, data=mf_treat_without_init_infect))
+# Type II ANOVA with no interaction
+Anova(lm(distance_bray_curtis ~ species + time, data=mf_treat_without_init_infect), type = 2)
+
+
+#' We see that dist diversity is fairly gamma-distributed, which makes sense because
+#' it is distance from a "central" point; there is an "average" and a "dispersion" but the exact distance is "random"
+#' Now, let's fit some models to this data. We should use a GLMM with dist distribution as the response variable
+#' to find out the average dist diversity turnover for each species and for each individual through time.
+#' \
+#' u ~ gamma(u_i, sigma_i)\
+#' u_i = a_j\
+#' a_j ~ N(u_sp, sigma_sp)\
+#' where i = sample, j = individual, sp = species
+#' Below, we use the dataset with JUST the controls.
+
+
+if ( FALSE) {
+    glmer_dist <- stan_glmer(log(distance.to.centroid) ~ -1 + species + (1|toadID)
+                           , data=mf_con_without_init_infect
+                           , family = gaussian(link="identity")
+                           , prior_intercept = normal(location = 0,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0, scale=2.5, autoscale=TRUE)
+                           , seed= 623445
+    )
+    save(glmer_dist, file="glmer_dist.RData")
+} else {
+    load("glmer_dist.RData")
+}
+prior_summary(glmer_dist)
+
+# Look at distributions according to models
+samps_glmer_dist<- rstan::extract(glmer_dist$stanfit)
+pre_test_set <- mf_treat_without_init_infect %>%
+    filter(time<=5) 
+samps_glmer_dist$beta  <- samps_glmer_dist$beta %>%
+    as.data.frame() %>%
+    mutate(Anbo=exp(V1), Anma=exp(V2), Lica=exp(V3), Lipi=exp(V4), Osse=exp(V5)) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi)
+samps_glmer_dist$beta %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(mapping=aes(x=species, y=(distance.to.centroid)))+
+    geom_violin() +
+    geom_point(data=mf_con_without_init_infect, aes(y=(distance.to.centroid), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pre_test_set, aes(y=(distance.to.centroid), x=species), position=position_jitter(width = 0.1, height=0), col="red")
+
+# Get standard deviation between toad individuals and samples
+# samp_sigma <- sigma(glmer_BC)
+toadID_sigma <- sd(samps_glmer_dist$b[,ncol(samps_glmer_dist$b)])
+sigma <- samps_glmer_dist$aux
+
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
+# List of each species
+species_list <- levels(factor(mf_con_without_init_infect$species))
+
+exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+for ( num_sp in 1:length(species_list)) {
+    # mu <- inv_logit(rnorm(4000, mean=samps_glmer_BC$dist[,num_sp], sd=toadID_sigma))
+    # exp_distr[,nump_sp] <- mu
+    exp_distr[,num_sp] <- rnorm(length(samps_glmer_dist$beta[,num_sp])
+                                ,mean=rnorm(4000, mean=samps_glmer_dist$beta[,num_sp], sd=toadID_sigma)
+                                ,sd=sigma  )
+    
+    # exp_distr[,num_sp] <- rnorm(length(samps_glmer_BC$dist[,num_sp]), mean=rnorm(length(samps_glmer_BC$dist[,num_sp]), mean=samps_glmer_BC$dist[,num_sp], sd=toadID_sigma), sd=samp_sigma)
+}
+
+exp_distr %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(aes(x=species, y=distance.to.centroid)) +
+    geom_violin() +
+    geom_point(data=mf_con_without_init_infect, aes(y=(distance.to.centroid), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pre_test_set, aes(y=(distance.to.centroid), x=species), position=position_jitter(width = 0.1, height=0), col="red")
+
+
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
+# Loop through and calculate probability of having diversity at that level
+pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_distmu=rep(NA, length(treat_indiv)), p_distmu=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
+for ( i in treat_indiv ) {
+    n_row <- match(i, treat_indiv)
+    sp <- unlist(strsplit(i,"_"))
+    num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
+    temp_bc <- mf_treat_without_init_infect %>%
+        filter(toadID==i, time <=5 ) %>%
+        filter(!is.na(distance.to.centroid))%>%
+        filter(!is.na(n))%>%
+        dplyr::select(distance.to.centroid) %>%
+        mutate(distance.to.centroid = log(distance.to.centroid)) %>%
+        pull()
+    
+    if ( length(temp_bc) > 1) {
+        exp_distmu <-  (fitdistr(exp(temp_bc), "normal")$estimate[1])
+        # exp_mu <-  fitdistr(temp_bc, "dist", start=list(shape1=0.1, shape2=0.1))$estimate[1]
+    } else if ( length(temp_bc) == 1) {
+        exp_distmu <- exp(temp_bc)
+    } else {
+        exp_distmu <- NA
+    }
+    
+    # dm is distance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
+    p_distmu <- sum(exp_distr[,sp[1]]<exp_distmu, na.rm=TRUE)/length(exp_distr[,sp[1]])
+    
+    ### Did they get infected?
+    infect <- max(mf_treat_without_init_infect %>%
+                      filter(toadID==i) %>%
+                      dplyr::select(eBD_raw) %>%
+                      pull()
+    )
+    
+    pre_exp_indiv[n_row,c("exp_distmu","p_distmu","infect")] <- c(exp_distmu, p_distmu, infect)
+    
+}
+# create species column
+pre_exp_indiv <- pre_exp_indiv %>%
+    separate(toadID, into=c("species","indiv"), remove = FALSE)
+
+# Plot results 
+gg_dist_p <- pre_exp_indiv %>%
+    filter(!is.na(exp_distmu)) %>%
+    ggplot(aes(x=p_distmu, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4) 
+# Raw numbers
+gg_dist_raw <- pre_exp_indiv %>%
+    filter(!is.na(exp_distmu)) %>%
+    ggplot(aes(x=exp_distmu, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4)
+grid.arrange(gg_dist_p, gg_dist_raw, nrow=1)
+all_p <- pre_exp_indiv %>%
+    dplyr::select(toadID, exp_distmu, p_distmu) %>%
+    full_join(all_p, by="toadID")
+
+##################
+
+#### Distance travelled ####
 #### Beta plot
 # First, fit a beta distribution
 x.fit.beta <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
@@ -1537,6 +1783,99 @@ all_p_infected <- pos_exp_indiv %>%
 
 
 ##### BETA DIVERSITY ####
+
+#### Dispersion ####
+if ( FALSE) {
+    glmer_dist_all <- stan_glmer(log(distance.to.centroid) ~ -1 + species + (1|toadID)
+                               , data=mf_all_noinfect
+                               , family = gaussian(link="identity")
+                               , prior_intercept = normal(location = 0,scale = 2.5, autoscale = TRUE)
+                               , prior = normal(location=0, scale=2.5, autoscale=TRUE)
+                               , seed= 623445
+    )
+    save(glmer_dist_all, file="glmer_dist_all.RData")
+} else {
+    load("glmer_dist_all.RData")
+}
+prior_summary(glmer_dist_all)
+
+# Look at distributions according to models
+samps_glmer_dist_all<- rstan::extract(glmer_dist_all$stanfit)
+pos_test_set <- mf_treat_without_init_infect %>%
+    filter(time>5) 
+samps_glmer_dist_all$beta %>%
+    as.data.frame() %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=exp((Anbo))
+           ,Anma=exp((Anma))
+           ,Lica=exp((Lica))
+           ,Lipi=exp((Lipi))
+           ,Osse=exp((Osse))) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(mapping=aes(x=species, y=distance.to.centroid))+
+    geom_violin() +
+    geom_point(data=mf_all_noinfect, aes(y=distance.to.centroid, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pos_test_set, aes(y=distance.to.centroid, x=species), position=position_jitter(width = 0.1, height=0), col="red")
+
+toad_intercept <- ranef(glmer_dist_all)$toadID
+samp_toad <- samps_glmer_dist_all$b[,1:nrow(toad_intercept)]
+colnames(samp_toad) <- rownames(toad_intercept)
+# toadID_sigma <- sd(samps_glmer_BC_all$b[,ncol(samps_glmer_BC_all$b)])
+samp_sigma <- samps_glmer_dist_all$aux
+
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals (different here bc some individuals don't have bray-curtis values)
+treat_indiv <- colnames(samp_toad)
+
+# Make key of species for each individual
+species_key <- treat_indiv %>%
+    as_tibble() %>%
+    rename(toadID=value) %>%
+    separate(toadID,into=c("species","indiv"), remove=FALSE)
+species_order <- levels(as.factor(mf_all_noinfect$species))
+
+exp_distr <- as.data.frame(matrix(ncol=length(treat_indiv), nrow=4000, dimnames = list(1:4000, treat_indiv)))
+for ( num_indiv in 1:length(treat_indiv)) {
+    indiv <- treat_indiv[num_indiv]
+    sp <- pull(species_key[num_indiv,"species"])
+    num_sp <- match(sp, species_order)
+    exp_distr[,num_indiv] <- rnorm(4000, mean=rnorm(4000, mean=(samps_glmer_dist_all$beta[,num_sp]+samp_toad[,indiv]), sd=samp_sigma))
+}
+
+pos_exp_indiv <- mf_treat_without_init_infect %>%
+    filter(time>5, !is.na(distance.to.centroid), toadID %in% colnames(samp_toad)) %>%
+    dplyr::select(toadID, time, species, distance.to.centroid, eBD_log) %>%
+    mutate(p_BCdist=NA)
+for ( r in 1:nrow(pos_exp_indiv)) {
+    pos_exp_indiv[r,"p_BCdist"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"distance.to.centroid"])/4000
+}
+
+gg_beta_pos_p <- pos_exp_indiv %>%
+    ggplot(aes(x=p_BCdist, y=eBD_log)) +
+    geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
+    geom_smooth(aes(col=species), method="lm",se=FALSE) +
+    geom_smooth(method="lm", se=FALSE, col="black")
+gg_beta_pos_raw <- pos_exp_indiv %>%
+    ggplot(aes(x=distance.to.centroid, y=eBD_log)) +
+    geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
+    geom_smooth(aes(col=species), method="lm",se=FALSE) +
+    geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
+
+exp_distr %>%
+    gather(key=toadID, value=distance.to.centroid) %>%
+    ggplot(aes(x=toadID, y=distance.to.centroid)) +
+    geom_violin() +
+    geom_point(data=pos_exp_indiv, aes(x=toadID, y=distance.to.centroid, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
+
+all_p_infected <- pos_exp_indiv %>%
+    dplyr::select(toadID, time, distance.to.centroid, p_BCdist) %>%
+    full_join(all_p_infected, by=c("toadID","time"))
+
+
+
+#### Distance Travelled ####
 if ( FALSE) {
     glmer_BC_all <- stan_glmer(distance_bray_curtis ~ -1 + species + (1|toadID)
                            , data=mf_all_noinfect

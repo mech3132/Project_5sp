@@ -36,12 +36,14 @@ mf.rare %>%
     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
     mutate(Treatment=ifelse(BD_infected=="y","Bd-exposed","Control"), "LnBd_load" = eBD_log) %>%
+    mutate(Contaminated = factor(ifelse(orig_contam ==1, "!Contam upon arrival",NA), levels=c("!Contam upon arrival"))) %>%
     ggplot(aes(x=time, y=indiv)) +
     geom_line(aes(group=toadID, col=Treatment)) +
     geom_point(aes(group=toadID,bg=LnBd_load), cex=4, pch=21)+
-    scale_color_manual(values=c("blue","orange")) +
+    scale_color_manual(values=c("black","blue","orange")) +
     scale_fill_gradient(low = "white", high = "red") +
     geom_vline(aes(xintercept=5.5), col="orange")+
+    geom_point(aes(group=toadID, col=Contaminated), cex=1, pch=19)+ ## NEW LINE
     facet_wrap(~species, nrow=5) +
     xlab("Time") +
     ylab("Individual Toad")
@@ -50,15 +52,30 @@ dev.off()
 
 
 #### Control data: how does it vary? ####
+# Calculate the hulls for each group
+# hull_toad <- mf_con_without_init_infect %>%
+#     group_by(toadID) %>%
+#     slice(chull(NMDS1, NMDS2))
+
 gg_NMDS <- mf_con_without_init_infect %>%
     ggplot(aes(x=NMDS1, y=NMDS2)) +
-    geom_point(aes(col=species), cex=2.5, show.legend = FALSE) +
+    # geom_line(aes(group=toadID,x=NMDS1, y=NMDS2), col="lightgrey") +
+    geom_point(aes(col=species, alpha=(time)),  cex=2.5, show.legend = FALSE) +
+    # geom_polygon(data = hull_toad, aes(fill=species), alpha = 0.1) +
     theme_classic()
+# gg_infect <- mf_treat_without_init_infect  %>%
+#     ggplot(aes(x=species, y=eBD_log)) +
+#     geom_point(aes(col=species), cex=2, position = position_jitter(width=0.1, height=0.05), show.legend = FALSE)+
+#     xlab("Species") +
+#     ylab("log Bd Load") +
+#     theme_classic()
 gg_infect <- mf_treat_without_init_infect  %>%
+    group_by(species, toadID) %>%
+    summarize(eBD_log = max(eBD_log)) %>%
     ggplot(aes(x=species, y=eBD_log)) +
-    geom_point(aes(col=species), cex=2, position = position_jitter(width=0.1, height=0.05), show.legend = FALSE)+
+    geom_point(aes(col=species), cex=2, position = position_jitter(width=0.3, height=0), show.legend = FALSE)+
     xlab("Species") +
-    ylab("log Bd Load") +
+    ylab("Max log Bd Load of each individual") +
     theme_classic()
 
 temp1 <- mf_con_without_init_infect %>%
@@ -80,13 +97,14 @@ temp4 <- mf_con_without_init_infect %>%
 
 gg_all <- rbind(temp1,temp2,temp3,temp4) %>%
     rename(Species=species) %>%
+    mutate(metric = factor(metric, levels=c("log_OTU_Richness","Inhibitory_OTU_Richness","Percent_Inhibitory","Bray_Curtis_Distance"))) %>%
+    mutate(Metric = gsub("_"," ",metric, fixed=TRUE)) %>%
     ggplot(aes(x=Species, y=value)) +
     geom_boxplot() +
-    geom_point(aes(col=Species), position = position_jitter(width=0.1, height=0))+
-    facet_grid(metric~., scales = "free") +
+    geom_point(aes(col=Species), position = position_jitter(width=0.1, height=0), alpha=1/3)+
+    facet_grid(Metric~., scales = "free", switch="y") +
     ylab("")+
-    xlab("Species") +
-    theme_classic()
+    xlab("Species") 
 lay <- rbind(c(1,2),
              c(3,2))
 
@@ -94,6 +112,10 @@ pdf("FIGURES/data_summary_controls.pdf", height = 8, width = 8)
 grid.arrange(gg_NMDS, gg_all, gg_infect, layout_matrix = lay)
 dev.off()
 
+# Note about data summary control:
+# The NMDS is all time points for control (uninfected) only; fading is time.
+# The infection is MAX infection
+# the others are all time points for control
 
 #### Inihibitory Richness affects chances of infection ####
 

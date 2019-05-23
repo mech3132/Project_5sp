@@ -1,7 +1,7 @@
 Exploratory Data Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Wed Mar 6 14:30:45 2019
+Thu May 23 14:00:34 2019
 
 First, load required packages
 -----------------------------
@@ -23,7 +23,7 @@ library(tidyverse) # for data manipulation
     ## ✖ dplyr::lag()    masks stats::lag()
 
 ``` r
-library(MASS) # For fitting distributions
+library(MASS) # For fitting distributions and NMDS
 ```
 
     ## 
@@ -168,6 +168,7 @@ One of the problems with the BD qPCR results is that we get very irregular resul
 ---------------------------------------------------------------------------------------------------------------------
 
 is unreliable. Here, I use a parameterized model to predict the "true" Bd load given the measurements taken. I would expect BD load to be modelled by an approximately poisson process; here, we check if this is true.
+A poisson distribution models a process where there is an expected "distance" or "time" between events, and you want to model how many events occur in a certain "distance" or "timespan". In the Bd system, an approximately equal amount of Bd is applied to each individual, and we measure the intensity of Bd through qPCR of a Bd-specific amplicon. One of the assumptions of the poisson distribution is that events are independent, and that the probability for an event over short intervals is the same as over long intervals. The Bd intensity is bound by zero, and has a hypothetical upper limit since after a certain infeciton intensity, amphibians will die. Lambda (the rate at which an event occurs) can be thought of as the number of Bd amplicons per "unit" area. In our methods, we assume that we swab all individuals equally. Thus, the "area swabbed" is the same across all individual amphibians. The Bd load is thus essentially a measurement of how many "events" there are in an unknown swabbing area. While samples of the sample individual over time violate one of the assumptions of the Poisson distribution, we are simply using all the samples to see (roughly) whether a poisson distribution is a good fit for the Bd intensity. We then use multiple qPCR results from ONE sample to estimate the "true" intensity of Bd on an individual sample. The poisson model is therefore not really modelling Bd infection, per say, but rather the accuracy of the qPCR process.
 
 ``` r
 # Filter out all information except BD-positive scenarios
@@ -292,7 +293,7 @@ cbind(final_BD[,c("Bd_Run_1","Bd_Run_2","Bd_Average_Run_3","pval","sig")], alt_i
     ## 53     0.00    83.41            53.73 7.750120e-03  TRUE       TRUE
     ## 54     0.00     0.00             4.69 3.113306e-01 FALSE      FALSE
 
-What we see is that by using a significant threshold of p=0.1 (which is fairly relaxed), the poisson model method is less stringent than the straight threshold method. I believe the poisson model method is likely more reliable since it is able to detect cases where infeciton is truely low, but consistent. For example, there are some cases where all 3/3 samples were BD-positive but at low abundances; however, the straight threshold model does not recognize it as a 'positive' since the abundances are below the individual threshold. I believe the poisson model method uses more of the information in the qPCR methods than the straight threshold method.
+What we see is that by using a significant threshold of p=0.1 (which is fairly relaxed), the poisson model method is less stringent than the straight threshold method. I believe the poisson model method is likely more reliable since it is able to detect cases where infection is truely low, but consistent. For example, there are some cases where all 3/3 samples were BD-positive but at low abundances; however, the straight threshold model does not recognize it as a 'positive' since the abundances are below the individual threshold. I believe the poisson model method uses more of the information in the qPCR methods than the straight threshold method.
 From here, we will add in the "expected" BD load (lambda) into the mapping file for each toad.
 
 ``` r
@@ -449,12 +450,12 @@ otu.filt <- otu %>%
     dplyr::select(-rowsums) 
 # Samples to keep in otu table (rarefied)
 OTU_names_rare <- otu_rare$X.OTU.ID
-otu.filt_rare <- otu %>%
+otu.filt_rare <- otu_rare %>%
     as_tibble() %>%
     dplyr::select(one_of(keepSamples)) %>% # Use rare
     replace(.<minOTUSample, 0) %>%
     mutate(rowsums=rowSums(.)) %>%
-    mutate(OTUID = OTU_names) %>%
+    mutate(OTUID = OTU_names_rare) %>%
     filter(rowsums > minOTUTab) %>%
     dplyr::select(-rowsums) 
 # View(otu.filt_rare)
@@ -471,36 +472,9 @@ ncol(otu.filt)
     ## [1] 784
 
 ``` r
-#### The mapping file already has diversity in it, so I need to add beta diversity and inihibitory bacterial diversity
+#### The mapping file already has diversity in it, so I need to add inihibitory bacterial diversity and beta diversity
 
-##### Beta diversity turnover #####
-# Get distance to sample directly before for every sample
-# AKA: How similar was the current sample to the sample JUST before that time point for that individual toad?
-# Note; tried to do this with dplyr but it is VERY slow. Just used base R subsetting instead
-
-for ( name in names(dm_all) ) {
-    mf.raw[,paste0("distance_",name)] <- NA
-    dm <- dm_all[[name]]
-    dm <- data.frame(dm, row.names = 1)
-    for ( i in 1:nrow(mf.raw) ) {
-        currentSample <- mf.raw$SampleID[i]
-        current <- mf.raw[i, c("toadID","time")]
-        prevSample <- mf.raw$SampleID[mf.raw$toadID==as.character(current[1,1]) & mf.raw$time == as.numeric(current[1,2]-1)]
-        if ( length(prevSample) > 0 & (currentSample %in% rownames(dm))) {
-            distTemp <- dm[currentSample,as.character(prevSample)]
-            if ( length(distTemp) > 0) {
-                mf.raw[i,paste0("distance_",name)] <- distTemp
-                
-            }
-        }
-        
-        # print(paste0("done",i," out of ",nrow(mf.tb)))
-    }
-}
-
-## 
-
-
+#### Inhibitory bacteria ####
 ### Get proportion and count of inhibitory otus from inhibitory otu metadata
 inhib.tb <- inhib %>%
     as_tibble() %>%
@@ -529,10 +503,68 @@ mf.raw <- mf.raw %>%
            ,inhibCounts =inhibCounts[match(SampleID, names(inhibCounts))]
            , inhibRich=inhibRich[match(SampleID, names(inhibRich))]) %>%
     mutate(percInhib = inhibCounts/n)
+
+
+##### Beta diversity turnover #####
+```
+
+Get distance to sample directly before for every sample AKA: How similar was the current sample to the sample JUST before that time point for that individual toad? This is different from beta DISPERSION. In cases where there is no sample before that sample, I omit it using NA The distance from the previous sample is also done BEFORE I filter for "contaminated" individuals-- but this should not matter because it is only dependent on the same indivdiual and all of those will be filtered out when we get rid of Bd contaminated individuals.
+
+``` r
+# Note; tried to do this with dplyr but it is VERY slow. Just used base R subsetting instead
+
+for ( name in names(dm_all) ) {
+    mf.raw[,paste0("distance_",name)] <- NA
+    dm <- dm_all[[name]]
+    dm <- data.frame(dm, row.names = 1)
+    for ( i in 1:nrow(mf.raw) ) {
+        currentSample <- mf.raw$SampleID[i]
+        current <- mf.raw[i, c("toadID","time")]
+        prevSample <- mf.raw$SampleID[mf.raw$toadID==as.character(current[1,1]) & mf.raw$time == as.numeric(current[1,2]-1)]
+        if ( length(prevSample) > 0 & (currentSample %in% rownames(dm))) {
+            distTemp <- dm[currentSample,as.character(prevSample)]
+            if ( length(distTemp) > 0) {
+                mf.raw[i,paste0("distance_",name)] <- distTemp
+                
+            }
+        }
+        
+        # print(paste0("done",i," out of ",nrow(mf.tb)))
+    }
+}
+
+## 
+##### Beta dispersion #####
+```
+
+Another aspect of beta diversity that might change between species and individuals is the dispersion of an individual relative to all other individuals. That is, how much different is an individual from the centroid of all samples at that time point of that species?
+
+``` r
 # Now, filter mf to rarefied OTU table
 mf.rare <- mf.raw %>%
     filter(SampleID %in% colnames(otu_rare))
 
+distance.to.centroids <- vector()
+for ( sp in levels(factor(mf.rare$species))) {
+    current.samps <- mf.rare %>%
+        filter(species==sp) %>%
+        dplyr::select(SampleID) %>%
+        pull()
+    current.dm <- dm_all$bray_curtis %>%
+        filter(X %in% current.samps) %>%
+        dplyr::select(one_of(c("X",current.samps)))
+    current.mf <- mf.rare %>%
+        filter(SampleID %in% current.samps)
+    # Same order?
+    # colnames(current.dm)[-1] == current.mf$SampleID
+    # There might be a warning that we are missing certain samples-- this is fine.
+    disp.temp <- betadisper(dist(data.frame(current.dm, row.names = 1)), group = (current.mf$time), type = "centroid")
+    distance.to.centroids <- c(distance.to.centroids, disp.temp$distances)
+}
+
+# add to mf.rare and mf.raw
+mf.rare$distance.to.centroid <- data.frame(distance.to.centroids)[match(mf.rare$SampleID, rownames(data.frame(distance.to.centroids))),]
+mf.raw$distance.to.centroid <- data.frame(distance.to.centroids)[match(mf.raw$SampleID, rownames(data.frame(distance.to.centroids))),]
 
 #### Adding NMDS ####
 # MAKE NMDS
@@ -679,35 +711,36 @@ mf.rare %>%
     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
     mutate(Treatment=ifelse(BD_infected=="y","Bd-exposed","Control"), "LnBd_load" = eBD_log) %>%
+    mutate(Contaminated = factor(ifelse(orig_contam ==1, "!Contaminated upon arrival",NA), levels=c("!Contaminated upon arrival"))) %>%
     ggplot(aes(x=time, y=indiv)) +
     geom_line(aes(group=toadID, col=Treatment)) +
     geom_point(aes(group=toadID,bg=LnBd_load), cex=4, pch=21)+
-    scale_color_manual(values=c("blue","orange")) +
+    scale_color_manual(values=c("black","blue","orange")) +
     scale_fill_gradient(low = "white", high = "red") +
     geom_vline(aes(xintercept=5.5), col="orange")+
+    geom_point(aes(group=toadID, col=Contaminated), cex=1, pch=19)+ ## NEW LINE
     facet_wrap(~species, nrow=5) +
     xlab("Time") +
     ylab("Individual Toad")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-11-1.png)
+    ## Warning: Removed 511 rows containing missing values (geom_point).
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
 ``` r
-# Here, we show only infected individuals and their BD load; the individuals who were already infected are removed.
-mf_treat_without_init_infect %>%
-    separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
-    mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
-    ggplot(aes(x=time, y=indiv)) +
-    theme_bw() +
-    geom_tile(aes(group=toadID,fill=eBD_log), lwd=0.5)+
-    scale_color_manual(values=c("grey","black")) +
-    geom_vline(aes(xintercept=5.5), col="orange")+
-    facet_wrap(~species, nrow=5)
-```
+# 
+# # Here, we show only infected individuals and their BD load; the individuals who were already infected are removed.
+# mf_treat_without_init_infect %>%
+#     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
+#     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
+#     ggplot(aes(x=time, y=indiv)) +
+#     theme_bw() +
+#     geom_tile(aes(group=toadID,fill=eBD_log), lwd=0.5)+
+#     scale_color_manual(values=c("grey","black")) +
+#     geom_vline(aes(xintercept=5.5), col="orange")+
+#     facet_wrap(~species, nrow=5)
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-11-2.png)
-
-``` r
 # What we learn is that no control individuals were infected at any point, after removing "pre-infected" individuals"
 
 #### PLOTTING BETA PLOTS ####
@@ -720,7 +753,7 @@ mf_con_without_init_infect %>%
     geom_point(aes(col=species), cex=3)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-12-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-14-1.png)
 
 ``` r
 # What do different species look like? (ALL data)
@@ -729,7 +762,7 @@ mf.rare %>%
     geom_point(aes(col=species), cex=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-12-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-14-2.png)
 
 ``` r
 # Color dots by time
@@ -738,13 +771,44 @@ mf_con_without_init_infect %>%
     geom_point(aes(col=time), cex=3)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-12-3.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-14-3.png)
 
 ``` r
 # Filtering dm to include only controls
 dm.filt.con <- dm.filt[mf_con_without_init_infect$SampleID,mf_con_without_init_infect$SampleID ]
 save(dm.filt.con, file="dm.filt.con.RData")
+
+
+adonis2(dm.filt.con ~ species:time, data=mf_con_without_init_infect, by="margin")
 ```
+
+    ## Permutation test for adonis under NA model
+    ## Marginal effects of terms
+    ## Permutation: free
+    ## Number of permutations: 999
+    ## 
+    ## adonis2(formula = dm.filt.con ~ species:time, data = mf_con_without_init_infect, by = "margin")
+    ##               Df SumOfSqs      F Pr(>F)    
+    ## species:time   5   23.582 17.213  0.001 ***
+    ## Residual     201   55.075                  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+adonis2(dm.filt.con ~ species + time + species:time, data=mf_con_without_init_infect, by="margin")
+```
+
+    ## Permutation test for adonis under reduced model
+    ## Marginal effects of terms
+    ## Permutation: free
+    ## Number of permutations: 999
+    ## 
+    ## adonis2(formula = dm.filt.con ~ species + time + species:time, data = mf_con_without_init_infect, by = "margin")
+    ##               Df SumOfSqs      F Pr(>F)    
+    ## species:time   4    5.589 6.3311  0.001 ***
+    ## Residual     197   43.476                  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 There is a significant effect of species AND time AND interaction on COMPOSITION
 
@@ -759,7 +823,7 @@ rbind(mf_con_without_init_infect, mf_treat_without_init_infect) %>%
     scale_fill_manual(values=c("blue","red"))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-13-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-15-1.png)
 
 ``` r
 mf_treat_without_init_infect %>%
@@ -770,7 +834,7 @@ mf_treat_without_init_infect %>%
     facet_wrap(~species, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-13-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-15-2.png)
 
 ``` r
 mf_treat_without_init_infect_post <- mf_treat_without_init_infect %>%
@@ -808,7 +872,7 @@ gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=logRich)) +
 grid.arrange(gg_shannon_all, gg_obsotu_all, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-14-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-16-1.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -830,7 +894,7 @@ gg_divtime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_divtime_con, gg_divtime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-14-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-16-2.png)
 
 Does diversity change over time in control individuals?
 
@@ -923,7 +987,7 @@ gg_richtime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_richtime_con, gg_richtime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-16-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-18-1.png)
 
 Does richness change over time in control individuals?
 
@@ -1008,6 +1072,7 @@ a\_j ~ N(u\_sp, sigma\_sp)
 where i = sample, j = individual, sp = species Below, we use the dataset with JUST the controls.
 
 ``` r
+# There was no effect of time
 if ( FALSE ) {
     lmer_shannon <- stan_lmer(shannon ~ -1 + species + (1|toadID), data=mf_con_without_init_infect
                               , prior = normal(0, 10, autoscale = TRUE)
@@ -1052,7 +1117,7 @@ samps_lmer_shannon$beta %>%
     geom_point(data=pre_test_set, aes(y=shannon, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-1.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -1117,7 +1182,7 @@ gg_shan_raw <- ggplot(pre_exp_indiv, aes(x=exp_shan, y=log(infect+1)))+
 grid.arrange(gg_shan_p, gg_shan_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-2.png)
 
 ``` r
 exp_distr %>%
@@ -1127,7 +1192,7 @@ exp_distr %>%
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_shan, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-3.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-3.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -1179,7 +1244,7 @@ samps_lmer_rich$beta %>%
     geom_point(data=pre_test_set, aes(y=logRich, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-4.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-4.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -1267,7 +1332,7 @@ gg_logRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_rich, y=log(infect+1)))+
 grid.arrange(gg_logRich_p, gg_logRich_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-5.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-5.png)
 
 ``` r
 exp_distr %>%
@@ -1277,7 +1342,7 @@ exp_distr %>%
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_rich, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-6.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-6.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -1286,6 +1351,279 @@ all_p <- pre_exp_indiv %>%
 
 #### BETA DIVERSTY ####
 
+#### Dispersion ####
+#### Beta plot
+# First, fit a beta distribution
+x.fit.dist <- seq(min(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)-sd(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)
+                  , max(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)+sd(log(mf_con_without_init_infect$distance.to.centroid), na.rm = TRUE)
+                  , length.out = 100)
+dist.fit <- fitdistr(mf_con_without_init_infect$distance.to.centroid[!is.na(mf_con_without_init_infect$distance.to.centroid)]
+                     , densfun="Gamma")
+y.pred.dist <- dgamma(x.fit.dist, shape = dist.fit$estimate[1], rate = dist.fit$estimate[2])
+# Try a normal too?
+dist.fit.norm <- fitdistr(log(mf_con_without_init_infect$distance.to.centroid[!is.na(mf_con_without_init_infect$distance.to.centroid)])
+                          , densfun="Normal")
+y.pred.dist.norm <- dnorm(x.fit.dist, mean = dist.fit.norm$estimate[1], sd = dist.fit.norm$estimate[2])
+
+mf_con_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=log(distance.to.centroid))) + 
+    geom_histogram(aes(y=..density..), bins=25) +
+    # geom_line(data=data.frame(x=x.fit.dist, y=y.pred.dist), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.fit.dist, y=y.pred.dist.norm), aes(x=x, y=y), col="blue") 
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-7.png)
+
+Gamma fits better.
+
+``` r
+# Check to see if turnover is changing with time significantly
+gg_disttime_con <- mf_con_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=time, y=distance.to.centroid)) + 
+    geom_line(aes(group=toadID)) +
+    geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
+    facet_grid(~species)
+gg_disttime_treat <- mf_treat_without_init_infect %>%
+    filter(!is.na(distance.to.centroid)) %>%
+    ggplot(aes(x=time, y=distance.to.centroid)) + 
+    geom_line(aes(group=toadID)) +
+    geom_point(aes(group=toadID, col=PABD)) +
+    scale_color_manual(values=c("blue","red"))+
+    geom_vline(aes(xintercept=5.5))+
+    facet_grid(~species)
+grid.arrange(gg_disttime_con, gg_disttime_treat, nrow=2)
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-22-1.png)
+
+``` r
+# Is there an effect of species and time on controls?
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance.to.centroid ~ species*time, data=mf_con_without_init_infect))
+```
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: distance.to.centroid
+    ##               Df  Sum Sq Mean Sq F value    Pr(>F)    
+    ## species        4  3.5000 0.87501  9.9777 2.258e-07 ***
+    ## time           1  2.2482 2.24819 25.6361 9.438e-07 ***
+    ## species:time   4  0.5585 0.13964  1.5923    0.1778    
+    ## Residuals    197 17.2761 0.08770                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+# Type II ANOVA with no interaction
+Anova(lm(distance.to.centroid ~ species + time, data=mf_con_without_init_infect), type = 2)
+```
+
+    ## Anova Table (Type II tests)
+    ## 
+    ## Response: distance.to.centroid
+    ##            Sum Sq  Df F value    Pr(>F)    
+    ## species    3.1343   4  8.8309 1.375e-06 ***
+    ## time       2.2482   1 25.3375 1.066e-06 ***
+    ## Residuals 17.8347 201                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+# Is there an effect of species and time on treatment??
+# Type I ANOVA (to check for interaction) (AB | A,B)
+anova(lm(distance_bray_curtis ~ species*time, data=mf_treat_without_init_infect))
+```
+
+    ## Analysis of Variance Table
+    ## 
+    ## Response: distance_bray_curtis
+    ##               Df Sum Sq  Mean Sq F value   Pr(>F)    
+    ## species        4 0.6596 0.164896  6.9084 2.99e-05 ***
+    ## time           1 0.0775 0.077468  3.2455  0.07301 .  
+    ## species:time   4 0.0392 0.009805  0.4108  0.80078    
+    ## Residuals    216 5.1557 0.023869                     
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+# Type II ANOVA with no interaction
+Anova(lm(distance_bray_curtis ~ species + time, data=mf_treat_without_init_infect), type = 2)
+```
+
+    ## Anova Table (Type II tests)
+    ## 
+    ## Response: distance_bray_curtis
+    ##           Sum Sq  Df F value    Pr(>F)    
+    ## species   0.6256   4  6.6233 4.742e-05 ***
+    ## time      0.0775   1  3.2807   0.07146 .  
+    ## Residuals 5.1949 220                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+We see that dist diversity is fairly gamma-distributed, which makes sense because it is distance from a "central" point; there is an "average" and a "dispersion" but the exact distance is "random" Now, let's fit some models to this data. We should use a GLMM with dist distribution as the response variable to find out the average dist diversity turnover for each species and for each individual through time.
+u ~ gamma(u\_i, sigma\_i)
+u\_i = a\_j
+a\_j ~ N(u\_sp, sigma\_sp)
+where i = sample, j = individual, sp = species Below, we use the dataset with JUST the controls.
+
+``` r
+if ( FALSE) {
+    glmer_dist <- stan_glmer(log(distance.to.centroid) ~ -1 + species + (1|toadID)
+                           , data=mf_con_without_init_infect
+                           , family = gaussian(link="identity")
+                           , prior_intercept = normal(location = 0,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0, scale=2.5, autoscale=TRUE)
+                           , seed= 623445
+    )
+    save(glmer_dist, file="glmer_dist.RData")
+} else {
+    load("glmer_dist.RData")
+}
+prior_summary(glmer_dist)
+```
+
+    ## Priors for model 'glmer_dist' 
+    ## ------
+    ## 
+    ## Coefficients
+    ##  ~ normal(location = [0,0,0,...], scale = [2.5,2.5,2.5,...])
+    ##      **adjusted scale = [0.68,0.68,0.68,...]
+    ## 
+    ## Auxiliary (sigma)
+    ##  ~ exponential(rate = 1)
+    ##      **adjusted scale = 0.27 (adjusted rate = 1/adjusted scale)
+    ## 
+    ## Covariance
+    ##  ~ decov(reg. = 1, conc. = 1, shape = 1, scale = 1)
+    ## ------
+    ## See help('prior_summary.stanreg') for more details
+
+``` r
+# Look at distributions according to models
+samps_glmer_dist<- rstan::extract(glmer_dist$stanfit)
+pre_test_set <- mf_treat_without_init_infect %>%
+    filter(time<=5) 
+samps_glmer_dist$beta  <- samps_glmer_dist$beta %>%
+    as.data.frame() %>%
+    mutate(Anbo=exp(V1), Anma=exp(V2), Lica=exp(V3), Lipi=exp(V4), Osse=exp(V5)) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi)
+samps_glmer_dist$beta %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(mapping=aes(x=species, y=(distance.to.centroid)))+
+    geom_violin() +
+    geom_point(data=mf_con_without_init_infect, aes(y=(distance.to.centroid), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pre_test_set, aes(y=(distance.to.centroid), x=species), position=position_jitter(width = 0.1, height=0), col="red")
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-1.png)
+
+``` r
+# Get standard deviation between toad individuals and samples
+# samp_sigma <- sigma(glmer_BC)
+toadID_sigma <- sd(samps_glmer_dist$b[,ncol(samps_glmer_dist$b)])
+sigma <- samps_glmer_dist$aux
+
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
+# List of each species
+species_list <- levels(factor(mf_con_without_init_infect$species))
+
+exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+for ( num_sp in 1:length(species_list)) {
+    # mu <- inv_logit(rnorm(4000, mean=samps_glmer_BC$dist[,num_sp], sd=toadID_sigma))
+    # exp_distr[,nump_sp] <- mu
+    exp_distr[,num_sp] <- rnorm(length(samps_glmer_dist$beta[,num_sp])
+                                ,mean=rnorm(4000, mean=samps_glmer_dist$beta[,num_sp], sd=toadID_sigma)
+                                ,sd=sigma  )
+    
+    # exp_distr[,num_sp] <- rnorm(length(samps_glmer_BC$dist[,num_sp]), mean=rnorm(length(samps_glmer_BC$dist[,num_sp]), mean=samps_glmer_BC$dist[,num_sp], sd=toadID_sigma), sd=samp_sigma)
+}
+
+exp_distr %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(aes(x=species, y=distance.to.centroid)) +
+    geom_violin() +
+    geom_point(data=mf_con_without_init_infect, aes(y=(distance.to.centroid), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pre_test_set, aes(y=(distance.to.centroid), x=species), position=position_jitter(width = 0.1, height=0), col="red")
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-2.png)
+
+``` r
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
+# Loop through and calculate probability of having diversity at that level
+pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_distmu=rep(NA, length(treat_indiv)), p_distmu=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
+for ( i in treat_indiv ) {
+    n_row <- match(i, treat_indiv)
+    sp <- unlist(strsplit(i,"_"))
+    num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
+    temp_bc <- mf_treat_without_init_infect %>%
+        filter(toadID==i, time <=5 ) %>%
+        filter(!is.na(distance.to.centroid))%>%
+        filter(!is.na(n))%>%
+        dplyr::select(distance.to.centroid) %>%
+        mutate(distance.to.centroid = log(distance.to.centroid)) %>%
+        pull()
+    
+    if ( length(temp_bc) > 1) {
+        exp_distmu <-  (fitdistr(exp(temp_bc), "normal")$estimate[1])
+        # exp_mu <-  fitdistr(temp_bc, "dist", start=list(shape1=0.1, shape2=0.1))$estimate[1]
+    } else if ( length(temp_bc) == 1) {
+        exp_distmu <- exp(temp_bc)
+    } else {
+        exp_distmu <- NA
+    }
+    
+    # dm is distance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
+    p_distmu <- sum(exp_distr[,sp[1]]<exp_distmu, na.rm=TRUE)/length(exp_distr[,sp[1]])
+    
+    ### Did they get infected?
+    infect <- max(mf_treat_without_init_infect %>%
+                      filter(toadID==i) %>%
+                      dplyr::select(eBD_raw) %>%
+                      pull()
+    )
+    
+    pre_exp_indiv[n_row,c("exp_distmu","p_distmu","infect")] <- c(exp_distmu, p_distmu, infect)
+    
+}
+# create species column
+pre_exp_indiv <- pre_exp_indiv %>%
+    separate(toadID, into=c("species","indiv"), remove = FALSE)
+
+# Plot results 
+gg_dist_p <- pre_exp_indiv %>%
+    filter(!is.na(exp_distmu)) %>%
+    ggplot(aes(x=p_distmu, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4) 
+# Raw numbers
+gg_dist_raw <- pre_exp_indiv %>%
+    filter(!is.na(exp_distmu)) %>%
+    ggplot(aes(x=exp_distmu, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4)
+grid.arrange(gg_dist_p, gg_dist_raw, nrow=1)
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-3.png)
+
+``` r
+all_p <- pre_exp_indiv %>%
+    dplyr::select(toadID, exp_distmu, p_distmu) %>%
+    full_join(all_p, by="toadID")
+
+##################
+
+#### Distance travelled ####
 #### Beta plot
 # First, fit a beta distribution
 x.fit.beta <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
@@ -1307,7 +1645,7 @@ mf_con_without_init_infect %>%
     geom_line(data=data.frame(x=x.fit.beta, y=y.pred.beta.norm), aes(x=x, y=y), col="blue") 
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-7.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-4.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -1329,7 +1667,7 @@ gg_betatime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_betatime_con, gg_betatime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-19-8.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-5.png)
 
 ``` r
 # Is there an effect of species and time on controls?
@@ -1474,7 +1812,7 @@ samps_glmer_BC$beta %>%
 
     ## Warning: Removed 27 rows containing missing values (geom_point).
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-20-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-1.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -1559,7 +1897,7 @@ gg_beta_raw <- pre_exp_indiv %>%
 grid.arrange(gg_beta_p, gg_beta_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-20-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-2.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -1581,7 +1919,7 @@ mf_con_without_init_infect %>%
     geom_line(data=data.frame(x=x.fit.percInhib, y=y.pred.percInhib), aes(x=x,y=y), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-20-3.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-3.png)
 
 ``` r
 mf_con_without_init_infect %>%
@@ -1591,7 +1929,7 @@ mf_con_without_init_infect %>%
     facet_grid(~species)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-20-4.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-4.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -1613,7 +1951,7 @@ gg_perctime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_perctime_con, gg_perctime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-20-5.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-5.png)
 
 ``` r
 # Does percent inhibitory change with species or time?
@@ -1744,7 +2082,7 @@ samps_glmer_percInhib$beta %>%
     geom_point(data=pre_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-1.png)
 
 ``` r
 # legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
@@ -1815,7 +2153,7 @@ gg_percInhib_raw <- ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(inf
 grid.arrange(gg_percInhib_p, gg_percInhib_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-2.png)
 
 ``` r
 mu_exp_distr %>%
@@ -1825,7 +2163,7 @@ mu_exp_distr %>%
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-3.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-3.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -1845,7 +2183,7 @@ ggplot(data=mf_con_without_init_infect, aes(x=(inhibRich))) +
     geom_line(data=data.frame(x=(x.fit.inhibRich), y=y.pred.inhibRich), aes(x=x,y=y), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-4.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-4.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -1867,7 +2205,7 @@ gg_inhibtime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_inhibtime_con, gg_inhibtime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-5.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-5.png)
 
 ``` r
 # Does proportion of inhibitory bacteria differ betwen species and time points?
@@ -1990,7 +2328,7 @@ new_samps_beta %>%
     geom_point(data=pre_test_set, aes(y=(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-6.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-6.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2080,7 +2418,7 @@ gg_inhibRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_inhibRich, y=log(infect+1)))
 grid.arrange(gg_inhibRich_p, gg_inhibRich_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-7.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-7.png)
 
 ``` r
 exp_distr %>%
@@ -2090,7 +2428,7 @@ exp_distr %>%
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_inhibRich, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-8.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-8.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -2150,7 +2488,7 @@ samps_lmer_shannon_all$beta %>%
     geom_point(data=post_test_set, aes(y=shannon, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-9.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-9.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2199,7 +2537,7 @@ gg_shan_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_shan_pos_p, gg_shan_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-10.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-10.png)
 
 ``` r
 exp_distr %>%
@@ -2209,7 +2547,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=shannon, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-11.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-11.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv
@@ -2261,7 +2599,7 @@ samps_lmer_rich_all$beta %>%
     geom_point(data=pos_test_set, aes(y=logRich, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-12.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-12.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2309,7 +2647,7 @@ gg_logRich_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_logRich_pos_p, gg_logRich_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-13.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-13.png)
 
 ``` r
 exp_distr %>%
@@ -2319,7 +2657,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=logRich, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-14.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-14.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2328,6 +2666,129 @@ all_p_infected <- pos_exp_indiv %>%
 
 
 ##### BETA DIVERSITY ####
+
+#### Dispersion ####
+if ( FALSE) {
+    glmer_dist_all <- stan_glmer(log(distance.to.centroid) ~ -1 + species + (1|toadID)
+                               , data=mf_all_noinfect
+                               , family = gaussian(link="identity")
+                               , prior_intercept = normal(location = 0,scale = 2.5, autoscale = TRUE)
+                               , prior = normal(location=0, scale=2.5, autoscale=TRUE)
+                               , seed= 623445
+    )
+    save(glmer_dist_all, file="glmer_dist_all.RData")
+} else {
+    load("glmer_dist_all.RData")
+}
+prior_summary(glmer_dist_all)
+```
+
+    ## Priors for model 'glmer_dist_all' 
+    ## ------
+    ## 
+    ## Coefficients
+    ##  ~ normal(location = [0,0,0,...], scale = [2.5,2.5,2.5,...])
+    ##      **adjusted scale = [0.71,0.71,0.71,...]
+    ## 
+    ## Auxiliary (sigma)
+    ##  ~ exponential(rate = 1)
+    ##      **adjusted scale = 0.29 (adjusted rate = 1/adjusted scale)
+    ## 
+    ## Covariance
+    ##  ~ decov(reg. = 1, conc. = 1, shape = 1, scale = 1)
+    ## ------
+    ## See help('prior_summary.stanreg') for more details
+
+``` r
+# Look at distributions according to models
+samps_glmer_dist_all<- rstan::extract(glmer_dist_all$stanfit)
+pos_test_set <- mf_treat_without_init_infect %>%
+    filter(time>5) 
+samps_glmer_dist_all$beta %>%
+    as.data.frame() %>%
+    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    mutate(Anbo=exp((Anbo))
+           ,Anma=exp((Anma))
+           ,Lica=exp((Lica))
+           ,Lipi=exp((Lipi))
+           ,Osse=exp((Osse))) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
+    gather(key=species, value=distance.to.centroid) %>%
+    ggplot(mapping=aes(x=species, y=distance.to.centroid))+
+    geom_violin() +
+    geom_point(data=mf_all_noinfect, aes(y=distance.to.centroid, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+    geom_point(data=pos_test_set, aes(y=distance.to.centroid, x=species), position=position_jitter(width = 0.1, height=0), col="red")
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-15.png)
+
+``` r
+toad_intercept <- ranef(glmer_dist_all)$toadID
+samp_toad <- samps_glmer_dist_all$b[,1:nrow(toad_intercept)]
+colnames(samp_toad) <- rownames(toad_intercept)
+# toadID_sigma <- sd(samps_glmer_BC_all$b[,ncol(samps_glmer_BC_all$b)])
+samp_sigma <- samps_glmer_dist_all$aux
+
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals (different here bc some individuals don't have bray-curtis values)
+treat_indiv <- colnames(samp_toad)
+
+# Make key of species for each individual
+species_key <- treat_indiv %>%
+    as_tibble() %>%
+    rename(toadID=value) %>%
+    separate(toadID,into=c("species","indiv"), remove=FALSE)
+species_order <- levels(as.factor(mf_all_noinfect$species))
+
+exp_distr <- as.data.frame(matrix(ncol=length(treat_indiv), nrow=4000, dimnames = list(1:4000, treat_indiv)))
+for ( num_indiv in 1:length(treat_indiv)) {
+    indiv <- treat_indiv[num_indiv]
+    sp <- pull(species_key[num_indiv,"species"])
+    num_sp <- match(sp, species_order)
+    exp_distr[,num_indiv] <- rnorm(4000, mean=rnorm(4000, mean=(samps_glmer_dist_all$beta[,num_sp]+samp_toad[,indiv]), sd=samp_sigma))
+}
+
+pos_exp_indiv <- mf_treat_without_init_infect %>%
+    filter(time>5, !is.na(distance.to.centroid), toadID %in% colnames(samp_toad)) %>%
+    dplyr::select(toadID, time, species, distance.to.centroid, eBD_log) %>%
+    mutate(p_BCdist=NA)
+for ( r in 1:nrow(pos_exp_indiv)) {
+    pos_exp_indiv[r,"p_BCdist"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"distance.to.centroid"])/4000
+}
+
+gg_beta_pos_p <- pos_exp_indiv %>%
+    ggplot(aes(x=p_BCdist, y=eBD_log)) +
+    geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
+    geom_smooth(aes(col=species), method="lm",se=FALSE) +
+    geom_smooth(method="lm", se=FALSE, col="black")
+gg_beta_pos_raw <- pos_exp_indiv %>%
+    ggplot(aes(x=distance.to.centroid, y=eBD_log)) +
+    geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
+    geom_smooth(aes(col=species), method="lm",se=FALSE) +
+    geom_smooth(method="lm", se=FALSE, col="black")
+grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-16.png)
+
+``` r
+exp_distr %>%
+    gather(key=toadID, value=distance.to.centroid) %>%
+    ggplot(aes(x=toadID, y=distance.to.centroid)) +
+    geom_violin() +
+    geom_point(data=pos_exp_indiv, aes(x=toadID, y=distance.to.centroid, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-17.png)
+
+``` r
+all_p_infected <- pos_exp_indiv %>%
+    dplyr::select(toadID, time, distance.to.centroid, p_BCdist) %>%
+    full_join(all_p_infected, by=c("toadID","time"))
+
+
+
+#### Distance Travelled ####
 if ( FALSE) {
     glmer_BC_all <- stan_glmer(distance_bray_curtis ~ -1 + species + (1|toadID)
                            , data=mf_all_noinfect
@@ -2396,7 +2857,7 @@ samps_glmer_BC_all$beta %>%
 
     ## Warning: Removed 31 rows containing missing values (geom_point).
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-15.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-18.png)
 
 ``` r
 toad_intercept <- ranef(glmer_BC_all)$toadID
@@ -2449,7 +2910,7 @@ gg_beta_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-16.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-19.png)
 
 ``` r
 exp_distr %>%
@@ -2459,7 +2920,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=distance_bray_curtis, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-17.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-20.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2515,7 +2976,7 @@ samps_glmer_percInhib_all$beta %>%
     geom_point(data=pos_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-18.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-21.png)
 
 ``` r
 # indiv_mu <- ranef(glmer_percInhib_all)$toadID
@@ -2574,7 +3035,7 @@ gg_percInhib_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_percInhib_pos_p, gg_percInhib_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-19.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-22.png)
 
 ``` r
 mu_exp_distr %>%
@@ -2584,7 +3045,7 @@ mu_exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=percInhib, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-20.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-23.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2635,7 +3096,7 @@ samps_glmer_inhibRich_all$beta %>%
     geom_point(data=pos_test_set, aes(y=log(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-21.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-24.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2694,7 +3155,7 @@ gg_inhibRich_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_inhibRich_pos_p, gg_inhibRich_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-22.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-25.png)
 
 ``` r
 exp_distr %>%
@@ -2704,7 +3165,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=inhibRich, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-23.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-26.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2732,7 +3193,7 @@ all_p %>%
     geom_point(aes(col=species), cex=3)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-24.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-27.png)
 
 ``` r
 # anova(lm(p_inhib ~ p_rich, data=con_exp_indiv))
@@ -2945,7 +3406,7 @@ mf_con_with_inhibOTUs %>%
     scale_fill_manual(values=set_col)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-25.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-28.png)
 
 ``` r
 #### TREATMENT ####
@@ -2982,7 +3443,7 @@ mf_treat_with_inhibOTUs %>%
     geom_vline(aes(xintercept=5.5), col="grey", lty=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-26.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-29.png)
 
 ``` r
 g_legend <- function(a.gplot){ # from stack overflow
@@ -3063,7 +3524,7 @@ grid.arrange(anbo_con, anma_con, lica_con, lipi_con, osse_con
              , bottom = textGrob("Time", vjust=1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-27.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-30.png)
 
 ``` r
 # Now for treatment 
@@ -3139,7 +3600,7 @@ grid.arrange(anbo_treat, anma_treat, lica_treat, lipi_treat, osse_treat
              , bottom = textGrob("Time", vjust=1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-21-28.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-31.png)
 
 ``` r
 ### Summraizing before and after exposure ####
@@ -3189,7 +3650,7 @@ mf_con_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-22-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-1.png)
 
 ``` r
 # TREAT
@@ -3239,7 +3700,7 @@ mf_treat_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-23-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-27-1.png)
 
 ``` r
 ### TEsting presence absence BD
@@ -3298,7 +3759,7 @@ mf_treat_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-28-1.png)
 
 ``` r
 # mf_treat_with_inhibOTUs %>%

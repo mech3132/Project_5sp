@@ -19,6 +19,9 @@ load("mf.rare.RData")
 # OTU table of inhibitory bacteria
 load("otu.inhibOnly.treat.RData")
 load("otu.inhibOnly.con.RData")
+# Distance matrices
+load("dm.filt.con.RData")
+load("dm.filt.treat.RData")
 
 # Previous analyses summaries
 load("all_p.RData")
@@ -69,8 +72,10 @@ lay <- rbind(c(1,2),
 grid.arrange(gg_NMDS, gg_all, gg_infect, layout_matrix = lay)
 
 #### Stats ####
-adonis(dist(dm.filt.con) ~ species*time, data=mf_con_without_init_infect)
-adonis(dist(dm.filt.treat) ~ species*time*PABD, data=mf_treat_without_init_infect_post)
+adonis2(dist(dm.filt.con) ~ species*time, data=mf_con_without_init_infect)
+mf_treat_without_init_infect_post <- mf_treat_without_init_infect %>%
+    filter(prepost == "Pos")
+adonis2(dist(dm.filt.treat) ~ species*time*PABD, data=mf_treat_without_init_infect_post)
 #' There is a significant effect of species, time, and PABD; all of these things also significantly interact
 #' EXCEPT species and PABD and all 3 together, which suggests species microbiomes change in the "same way" when infected
 
@@ -170,7 +175,6 @@ all_p %>%
     ggplot(aes(x=p_rich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
-
 #### PABD and instability ####
 
 #' (2a) Does instability of microbiome influence BD infection rate?\
@@ -196,6 +200,46 @@ all_p %>%
 #' 
 #' \
 #' (2b) Does instability of microbiome influence BD infection intensity?\
+# 
+# lm_eBD_bc <- lm(eBD_log ~ species*exp_mu, data=all_p)
+# Anova(lm_eBD_bc)
+# all_p %>%
+#     ggplot(aes(x=exp_mu, y=eBD_log)) +
+#     geom_point(aes(col=species), cex=3) 
+
+lm_BD_pbc <- lm(eBD_log ~ species*p_mu, data=all_p)
+anova(lm_BD_pbc)
+Anova(lm_BD_pbc, type=2)
+all_p %>%
+    ggplot(aes(x=p_mu, y=eBD_log)) +
+    geom_point(aes(col=species), cex=3) 
+
+
+#### PABD and dispersion ####
+
+#' (2a) Does dispersion of microbiome influence BD infection rate?\
+#' Here we look at average distance travelled (bray-curtis) between samples
+#' prior to being infected. We see if it is correlated to infection risk.
+# 
+# glm_PABD_bc <- glm(PABD ~ species*exp_mu, data=all_p, family=binomial)
+# Anova(glm_PABD_bc)
+# all_p %>%
+#     ggplot(aes(x=exp_mu, y=PABD)) +
+#     geom_point(aes(col=species), cex=3) 
+
+glm_PABD_pbc <- glm(PABD ~ species*p_distmu, data=all_p, family=binomial)
+anova(glm_PABD_pbc, test="Chisq")
+Anova(glm_PABD_pbc, type=2)
+all_p %>%
+    ggplot(aes(x=p_mu, y=PABD)) +
+    geom_point(aes(col=species), cex=3) 
+
+
+#### eBD and dispersion ####
+
+#' 
+#' \
+#' (2b) Does dispersion of microbiome influence BD infection intensity?\
 # 
 # lm_eBD_bc <- lm(eBD_log ~ species*exp_mu, data=all_p)
 # Anova(lm_eBD_bc)
@@ -251,6 +295,9 @@ all_p %>%
     ggplot(aes(x=p_pinhib, y=PABD)) +
     geom_point(aes(col=species), cex=3)
 
+
+
+
 #### eBD and inhibitory ####
 
 #' (3b) Does composition of microbiome influence BD infection intensity?\
@@ -285,9 +332,13 @@ all_p %>%
     ggplot(aes(x=p_pinhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
+####Part II: Affect of BD infection on microbiome state####
 #' 
 #' Part II: Affect of BD infection on microbiome state
 #' 
+#' 
+#### Diversity and PABD ####
+
 #' (1a) Does BD infection state affect microbiome diversity?
 #' - OTU richness vs BD infection
 #' - Chao1 richness vs BD infection
@@ -336,7 +387,7 @@ all_p_infected %>%
     geom_point(aes(col=species), cex=3, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
 
-
+#### Diversity and eBD ####
 #' 
 #' (1b) Does BD infection intensity affect microbiome diversity?
 # 
@@ -366,6 +417,8 @@ all_p_infected %>%
     ggplot(aes(x=eBD_log, y=p_rich)) +
     geom_point(aes(col=species), cex=3)
 
+#### Instability and PABD ####
+
 #' (2a) Does BD infection state affect microbiome instability?
 # 
 # lm_bc_PABD <- lm(distance_bray_curtis ~ species*PABD, data=all_p_infected)
@@ -388,6 +441,8 @@ all_p_infected %>%
     geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
 
+#### Instablity and eBD ####
+
 #' (2b) Does BD infection intensity affect microbiome instability?
 #' 
 # lm_bc_eBD <- lm(distance_bray_curtis ~ species*eBD_log, data=all_p_infected)
@@ -403,6 +458,8 @@ Anova(lm_pbc_eBD)
 all_p_infected %>%
     ggplot(aes(x=eBD_log, y=p_BC)) +
     geom_point(aes(color=species), cex=4)
+
+#### Inhib and PABD ####
 
 #' (3a) Does BD infection state affect microbiome composition?
 # 
@@ -447,6 +504,7 @@ all_p_infected %>%
     geom_point(aes(col=species), cex=3, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
 
+#### Inhib and eBD ####
 
 #' 
 #' (3b) Does BD infection intensity affect microbiome composition?
