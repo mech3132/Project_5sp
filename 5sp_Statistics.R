@@ -36,6 +36,12 @@ all_p_infected <- all_p_infected %>%
     mutate(PABD=ifelse(eBD_log>0,1,0)) %>%
     separate(toadID, into=c("species","indiv"), remove=FALSE)
 
+# ### TESTING: Remove values for intensity
+# all_p <- all_p %>%
+#     mutate(eBD_log = ifelse(eBD_log>0,eBD_log,NA))
+# all_p_infected <- all_p_infected %>%
+#     mutate(eBD_log = ifelse(eBD_log>0,eBD_log,NA))
+
 #### CURSORY GLANCE AT DATA ####
 gg_NMDS <- mf_con_without_init_infect %>%
     ggplot(aes(x=NMDS1, y=NMDS2)) +
@@ -72,12 +78,251 @@ lay <- rbind(c(1,2),
 grid.arrange(gg_NMDS, gg_all, gg_infect, layout_matrix = lay)
 
 #### Stats ####
-adonis2(dist(dm.filt.con) ~ species*time, data=mf_con_without_init_infect)
+does_comp_differ_btwn_sp_and_across_time_con <- adonis2(dist(dm.filt.con) ~ species*time, data=mf_con_without_init_infect)
+does_comp_differ_btwn_sp_and_across_time_con
+beta_con_main_p <- does_comp_differ_btwn_sp_and_across_time_con$`Pr(>F)`[1:2]
+beta_con_interaction_p <- does_comp_differ_btwn_sp_and_across_time_con$`Pr(>F)`[3]
+beta_con_main_f <- does_comp_differ_btwn_sp_and_across_time_con$`F`[1:2]
+beta_con_interaction_f <- does_comp_differ_btwn_sp_and_across_time_con$`F`[3]
+
+
 mf_treat_without_init_infect_post <- mf_treat_without_init_infect %>%
     filter(prepost == "Pos")
-adonis2(dist(dm.filt.treat) ~ species*time*PABD, data=mf_treat_without_init_infect_post)
+does_comp_differ_btwn_sp_and_across_time_and_infect_treat <- adonis2(dist(dm.filt.treat) ~ species*time*PABD, data=mf_treat_without_init_infect_post)
+does_comp_differ_btwn_sp_and_across_time_and_infect_treat
+beta_treat_main_p <- does_comp_differ_btwn_sp_and_across_time_and_infect_treat$`Pr(>F)`[1:2]
+beta_treat_interaction_p <- does_comp_differ_btwn_sp_and_across_time_and_infect_treat$`Pr(>F)`[4]
+beta_treat_main_f <- does_comp_differ_btwn_sp_and_across_time_and_infect_treat$`F`[1:2]
+beta_treat_interaction_f <- does_comp_differ_btwn_sp_and_across_time_and_infect_treat$`F`[4]
+
+
+
 #' There is a significant effect of species, time, and PABD; all of these things also significantly interact
 #' EXCEPT species and PABD and all 3 together, which suggests species microbiomes change in the "same way" when infected
+
+
+#### Preliminary stats on broad patterns ####
+
+### RICHNESS AND TIME ###
+
+#' Does richness change over time in control individuals?
+# Type I ANOVA to test for interaction-- (AB | A, B)
+rich_con_interaction_lm <- lm(logRich ~ species*time, data=mf_con_without_init_infect)
+rich_con_interaction <- anova(rich_con_interaction_lm)
+rich_con_interaction
+# Use Type II ANOVA (no interaction present)
+rich_con_main_lm <- lm(logRich ~ species + time, data=mf_con_without_init_infect)
+rich_con_main <- Anova(rich_con_main_lm, type = 2)
+rich_con_main
+# There is a significant effect of species but not time or interaction
+
+#' Does richness change over time in treatment individuals?
+# Type I ANOVA to test for interaction (AB | A,B)
+rich_treat_interaction_lm <- lm(logRich ~ species*time, data=mf_treat_without_init_infect)
+rich_treat_interaction <- anova(rich_treat_interaction_lm)
+rich_treat_interaction
+# Type III ANOVA (valid in presence of interaction)
+rich_treat_main_lm <- lm(logRich ~ species * time, data=mf_treat_without_init_infect, contrasts=list(species=contr.sum))
+rich_treat_main <- Anova(rich_treat_main_lm, type=3)
+rich_treat_main
+
+### DISTANCE TO CENTROID AND TIME ####
+#' Is there an effect of species and time on controls?
+# Type I ANOVA (to check for interaction) (AB | A,B)
+centroid_con_interaction_lm <- lm(log(distance.to.centroid) ~ species*time, data=mf_con_without_init_infect)
+centroid_con_interaction <- anova(centroid_con_interaction_lm)
+centroid_con_interaction
+# Type II ANOVA with no interaction
+centroid_con_main_lm <- lm(log(distance.to.centroid) ~ species + time, data=mf_con_without_init_infect)
+centroid_con_main <- Anova(centroid_con_main_lm, type = 2)
+centroid_con_main
+
+#' Is there an effect of species and time on treatment??
+# Type I ANOVA (to check for interaction) (AB | A,B)
+centroid_treat_interaction_lm <- lm(distance_bray_curtis ~ species*time, data=mf_treat_without_init_infect)
+centroid_treat_interaction <- anova(centroid_treat_interaction_lm)
+centroid_treat_interaction
+# Type II ANOVA with no interaction
+centroid_treat_main_lm <- lm(distance_bray_curtis ~ species + time, data=mf_treat_without_init_infect)
+centroid_treat_main <- Anova(centroid_treat_main_lm, type = 2)
+centroid_treat_main
+
+### DISPERSAL AND TIME ###
+#' Is there an effect of species and time on controls?
+# Type I ANOVA (to check for interaction) (AB | A,B)
+disp_con_interaction_lm <- lm(distance_bray_curtis ~ species*time, data=mf_con_without_init_infect)
+disp_con_interaction <- anova(disp_con_interaction_lm)
+disp_con_interaction
+# Type II ANOVA with no interaction
+disp_con_main_lm <- lm(distance_bray_curtis ~ species + time, data=mf_con_without_init_infect)
+disp_con_main <- Anova(disp_con_main_lm, type = 2)
+disp_con_main
+
+#' Is there an effect of species and time on treatment??
+# Type I ANOVA (to check for interaction) (AB | A,B)
+disp_treat_interaction_lm <- lm(distance_bray_curtis ~ species*time, data=mf_treat_without_init_infect)
+disp_treat_interaction <- anova(disp_treat_interaction_lm)
+disp_treat_interaction
+# Type II ANOVA with no interaction
+disp_treat_main_lm <- lm(distance_bray_curtis ~ species + time, data=mf_treat_without_init_infect)
+disp_treat_main <- Anova(disp_treat_main_lm, type = 2)
+disp_treat_main
+
+### PERCENT INHIB ###
+#' Does percent inhibitory change with species or time?
+# Type I ANOVA (to test for interaction) in control group?
+pinhib_con_interaction_glm <- glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n)
+pinhib_con_interaction <- anova(pinhib_con_interaction_glm, test = "Chisq")
+pinhib_con_interaction
+# Type III ANOVA (to test for main effects, given interaction) in control group?
+pinhib_con_main_glm <- glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n, contrasts=list(species=contr.sum))
+pinhib_con_main <- Anova(pinhib_con_main_glm, type=3)
+pinhib_con_main
+
+# Does percent inhibitory change with species or time in treatment group?
+# Type I ANOVA (to test for interaction) in control group?
+pinhib_treat_interaction_glm <- glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n)
+pinhib_treat_interaction <- anova(pinhib_treat_interaction_glm, test = "Chisq")
+pinhib_treat_interaction
+# Type III ANOVA (to test for main effects, given interaction) in control group?
+pinhib_treat_main_glm <- glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n, contrasts = list(species=contr.sum))
+pinhib_treat_main <- Anova(pinhib_treat_main_glm, type=3)
+pinhib_treat_main
+
+### INHIB RICH ###
+# Does proportion of inhibitory bacteria differ betwen species and time points?
+# Type I ANOVA to test for interactions in control
+inhibRich_con_interaction_glm <- glm(inhibRich ~ species*time, data=mf_con_without_init_infect, family=poisson())
+inhibRich_con_interaction <- anova(inhibRich_con_interaction_glm, test="Chisq")
+inhibRich_con_interaction
+# TYpe III ANOVA to test for main effects with interactions in control
+inhibRich_con_main_glm <- glm(inhibRich ~ species*time, data=mf_con_without_init_infect, family=poisson(), contrasts=list(species=contr.sum))
+inhibRich_con_main <- Anova(inhibRich_con_main_glm,type=3)
+inhibRich_con_main
+
+# Type I ANOVA to test for interactions
+inhibRich_treat_interaction_glm <- glm(inhibRich ~ species*time, data=mf_treat_without_init_infect, family=poisson())
+inhibRich_treat_interaction <- anova(inhibRich_treat_interaction_glm, test="Chisq")
+inhibRich_treat_interaction
+# TYpe III ANOVA to test for main effects with interactions
+inhibRich_treat_main_glm <- glm(inhibRich ~ species*time, data=mf_treat_without_init_infect, family=poisson(), contrasts = list(species=contr.sum))
+inhibRich_treat_main <- Anova(inhibRich_treat_main_glm,type=3)
+inhibRich_treat_main
+
+#### Summarize overall trends into table ####
+
+rich_con_main_p <- rich_con_main$`Pr(>F)`[1:2]
+# rich_con_time_p <- rich_con_main$`Pr(>F)`[2]
+rich_con_interaction_p <- rich_con_interaction$`Pr(>F)`[3]
+rich_treat_main_p <- rich_treat_main$`Pr(>F)`[1:2]
+# rich_treat_time_p <- rich_treat_main$`Pr(>F)`[2]
+rich_treat_interaction_p <- rich_treat_interaction$`Pr(>F)`[3]
+rich_con_main_f <- rich_con_main$`F value`[1:2]
+# rich_con_time_f <- rich_con_main$`F value`[2]
+rich_con_interaction_f <- rich_con_interaction$`Pr(>F)`[3]
+rich_treat_main_f <- rich_treat_main$`F value`[1:2]
+# rich_treat_time_f <- rich_treat_main$`F value`[2]
+rich_treat_interaction_f <- rich_treat_interaction$`F value`[3]
+rich_con_time_eff <- rich_con_main_lm$coefficients["time"]
+rich_treat_time_eff <- rich_treat_main_lm$coefficients["time"]
+
+
+centroid_con_main_p <- centroid_con_main$`Pr(>F)`[1:2]
+# centroid_con_time_p <- centroid_con_main$`Pr(>F)`[2]
+centroid_con_interaction_p <- centroid_con_interaction$`Pr(>F)`[3]
+centroid_treat_main_p <- centroid_treat_main$`Pr(>F)`[1:2]
+# centroid_treat_time_p <- centroid_treat_main$`Pr(>F)`[2]
+centroid_treat_interaction_p <- centroid_treat_interaction$`Pr(>F)`[3]
+centroid_con_main_f <- centroid_con_main$`F value`[1:2]
+# centroid_con_time_f <- centroid_con_main$`F value`[2]
+centroid_con_interaction_f <- centroid_con_interaction$`Pr(>F)`[3]
+centroid_treat_main_f <- centroid_treat_main$`F value`[1:2]
+# centroid_treat_time_f <- centroid_treat_main$`F value`[2]
+centroid_treat_interaction_f <- centroid_treat_interaction$`F value`[3]
+centroid_con_time_eff <- centroid_con_main_lm$coefficients["time"]
+centroid_treat_time_eff <- centroid_treat_main_lm$coefficients["time"]
+
+disp_con_main_p <- disp_con_main$`Pr(>F)`[1:2]
+# disp_con_time_p <- disp_con_main$`Pr(>F)`[2]
+disp_con_interaction_p <- disp_con_interaction$`Pr(>F)`[3]
+disp_treat_main_p <- disp_treat_main$`Pr(>F)`[1:2]
+# disp_treat_time_p <- disp_treat_main$`Pr(>F)`[2]
+disp_treat_interaction_p <- disp_treat_interaction$`Pr(>F)`[3]
+disp_con_main_f <- disp_con_main$`F value`[1:2]
+# disp_con_time_f <- disp_con_main$`F value`[2]
+disp_con_interaction_f <- disp_con_interaction$`Pr(>F)`[3]
+disp_treat_main_f <- disp_treat_main$`F value`[1:2]
+# disp_treat_time_f <- disp_treat_main$`F value`[2]
+disp_treat_interaction_f <- disp_treat_interaction$`F value`[3]
+disp_con_time_eff <- disp_con_main_lm$coefficients["time"]
+disp_treat_time_eff <- disp_treat_main_lm$coefficients["time"]
+
+pinhib_con_main_p <- pinhib_con_main$`Pr(>Chisq)`[1:2]
+# pinhib_con_time_p <- pinhib_con_main$`Pr(>F)`[2]
+pinhib_con_interaction_p <- pinhib_con_interaction$`Pr(>Chi)`[4]
+pinhib_treat_main_p <- pinhib_treat_main$`Pr(>Chisq)`[1:2]
+# pinhib_treat_time_p <- pinhib_treat_main$`Pr(>F)`[2]
+pinhib_treat_interaction_p <- pinhib_treat_interaction$`Pr(>Chi)`[4]
+pinhib_con_main_f <- pinhib_con_main$`LR Chisq`[1:2]
+# pinhib_con_time_f <- pinhib_con_main$`LR Chisq`[2]
+pinhib_con_interaction_f <- pinhib_con_interaction$Deviance[4]
+pinhib_treat_main_f <- pinhib_treat_main$`LR Chisq`[1:2]
+# pinhib_treat_time_f <- pinhib_treat_main$`LR Chisq`[2]
+pinhib_treat_interaction_f <- pinhib_treat_interaction$Deviance[4]
+pinhib_con_time_eff <- pinhib_con_main_glm$coefficients["time"]
+pinhib_treat_time_eff <- pinhib_treat_main_glm$coefficients["time"]
+
+
+inhibRich_con_main_p <- inhibRich_con_main$`Pr(>Chisq)`[1:2]
+# inhibRich_con_time_p <- inhibRich_con_main$`Pr(>F)`[2]
+inhibRich_con_interaction_p <- inhibRich_con_interaction$`Pr(>Chi)`[4]
+inhibRich_treat_main_p <- inhibRich_treat_main$`Pr(>Chisq)`[1:2]
+# inhibRich_treat_time_p <- inhibRich_treat_main$`Pr(>F)`[2]
+inhibRich_treat_interaction_p <- inhibRich_treat_interaction$`Pr(>Chi)`[4]
+inhibRich_con_main_f <- inhibRich_con_main$`LR Chisq`[1:2]
+# inhibRich_con_time_f <- inhibRich_con_main$`LR Chisq`[2]
+inhibRich_con_interaction_f <- inhibRich_con_interaction$Deviance[4]
+inhibRich_treat_main_f <- inhibRich_treat_main$`LR Chisq`[1:2]
+# inhibRich_treat_time_f <- inhibRich_treat_main$`LR Chisq`[2]
+inhibRich_treat_interaction_f <- inhibRich_treat_interaction$Deviance[4]
+inhibRich_con_time_eff <- inhibRich_con_main_glm$coefficients["time"]
+inhibRich_treat_time_eff <- inhibRich_treat_main_glm$coefficients["time"]
+
+stat_results <- as.data.frame(matrix(ncol=5, nrow=12, dimnames = list(NULL,c("Microbiome metric","Control or Treatment","Main effect: species","Main effect: time", "Interaction: species x time"))), check.names=FALSE)
+stat_results$`Microbiome metric` <- c("Beta Diversity"
+                                      , "Beta Diversity"
+                                      , "OTU Richness"
+                                      , "OTU RIchness"
+                                      , "Distance to centroid"
+                                      , "Distance to centroid"
+                                      , "Stability (BC distance)"
+                                      , "Stability (BC distance)"
+                                      , "Percent Inhibitory"
+                                      , "Percent Inhibitory"
+                                      ,"Inhibitory Richness"
+                                      ,"Inhibitory Richness"
+                                      )
+stat_results$`Control or Treatment` <- rep(c("Control","Treatent"), 6)
+current_row <- 1
+for ( test in c("beta","rich","centroid","disp","pinhib","inhibRich") ) {
+    if (test %in% c("beta","rich","centroid","disp")) {
+        stat_main<- ", F="
+        stat_interaction <- ", F="
+    } else {
+        stat_main<- ", Chisq="
+        stat_interaction <- ", Chi="
+    }
+    for ( ct in c("con","treat")) {
+            stat_results[current_row, 3:5] <- c(paste0("p=", signif(get(paste(test, ct, "main_p", sep="_"))[1],3), stat_main, signif(get(paste(test, ct, "main_f", sep="_"))[1],3))
+              , paste0("p=", signif(get(paste(test, ct, "main_p", sep="_"))[2],3), stat_main, signif(get(paste(test, ct, "main_f", sep="_"))[2],3))
+              , paste0("p=", signif(get(paste(test, ct, "interaction_p", sep="_")),3), stat_interaction, signif(get(paste(test, ct, "interaction_f", sep="_"))[1],3))
+            )
+        
+        current_row <- current_row+1
+    }
+}
+
+stat_results
 
 
 #### PART I ####
@@ -227,11 +472,11 @@ all_p %>%
 #     ggplot(aes(x=exp_mu, y=PABD)) +
 #     geom_point(aes(col=species), cex=3) 
 
-glm_PABD_pbc <- glm(PABD ~ species*p_distmu, data=all_p, family=binomial)
-anova(glm_PABD_pbc, test="Chisq")
-Anova(glm_PABD_pbc, type=2)
+glm_PABD_pdist <- glm(PABD ~ species*p_distmu, data=all_p, family=binomial)
+anova(glm_PABD_pdist, test="Chisq")
+Anova(glm_PABD_pdist, type=2)
 all_p %>%
-    ggplot(aes(x=p_mu, y=PABD)) +
+    ggplot(aes(x=p_distmu, y=PABD)) +
     geom_point(aes(col=species), cex=3) 
 
 
@@ -247,11 +492,11 @@ all_p %>%
 #     ggplot(aes(x=exp_mu, y=eBD_log)) +
 #     geom_point(aes(col=species), cex=3) 
 
-lm_BD_pbc <- lm(eBD_log ~ species*p_mu, data=all_p)
-anova(lm_BD_pbc)
-Anova(lm_BD_pbc, type=2)
+lm_BD_pdist <- lm(eBD_log ~ species*p_distmu, data=all_p)
+anova(lm_BD_pdist)
+Anova(lm_BD_pdist, type=2) ## SIG
 all_p %>%
-    ggplot(aes(x=p_mu, y=eBD_log)) +
+    ggplot(aes(x=p_distmu, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
 #### PABD and inhibitory ####
@@ -441,7 +686,9 @@ all_p_infected %>%
     geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
 
-#### Instablity and eBD ####
+
+
+#### Dispersion and eBD ####
 
 #' (2b) Does BD infection intensity affect microbiome instability?
 #' 
@@ -457,6 +704,49 @@ anova(lm_pbc_eBD)
 Anova(lm_pbc_eBD)
 all_p_infected %>%
     ggplot(aes(x=eBD_log, y=p_BC)) +
+    geom_point(aes(color=species), cex=4)
+
+
+#### Dispersion and PABD ####
+
+#' (2a) Does BD infection state affect microbiome dispersion?
+# 
+# lm_dist_PABD <- lm(distance.to.centroid ~ species*PABD, data=all_p_infected)
+# Anova(lm_dist_PABD)
+# all_p_infected %>%
+#     mutate(PABD = factor(PABD)) %>%
+#     ggplot(aes(x=PABD, y=distance.to.centroid)) +
+#     geom_violin() +
+#     geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
+#     facet_wrap(~species, nrow=1)
+
+# try standardized
+lm_pdist_PABD <- lm(p_BCdist ~ species*PABD, data=all_p_infected)
+anova(lm_pdist_PABD) ## SIG
+Anova(lm_pdist_PABD)
+all_p_infected %>%
+    mutate(PABD = factor(PABD)) %>%
+    ggplot(aes(x=PABD, y=p_BCdist)) +
+    geom_boxplot() +
+    geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
+    facet_wrap(~species, nrow=1)
+
+#### Dispersion and eBD ####
+
+#' (2b) Does BD infection intensity affect microbiome dispersion?
+#' 
+# lm_dist_eBD <- lm(distance.to.centroid ~ species*eBD_log, data=all_p_infected)
+# Anova(lm_dist_eBD)
+# all_p_infected %>%
+#     ggplot(aes(x=eBD_log, y=distance.to.centroid)) +
+#     geom_point(aes(color=species), cex=4)
+
+# try standardized
+lm_pbcdist_eBD <- lm(p_BCdist ~ species*eBD_log, data=all_p_infected)
+anova(lm_pbcdist_eBD)
+Anova(lm_pbcdist_eBD)
+all_p_infected %>%
+    ggplot(aes(x=eBD_log, y=p_BCdist)) +
     geom_point(aes(color=species), cex=4)
 
 #### Inhib and PABD ####
