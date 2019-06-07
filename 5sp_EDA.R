@@ -2095,8 +2095,8 @@ if ( FALSE) {
     glmer_BC_all <- stan_glmer(distance_bray_curtis ~ -1 + species + (1|toadID)
                            , data=mf_all_noinfect
                            , family =mgcv::betar
-                           , prior_intercept = normal(location = 0.5,scale = 0.1, autoscale = TRUE)
-                           , prior = normal(location=0.5, scale=0.1, autoscale=TRUE)
+                           , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
                            , seed= 623445
     )
     save(glmer_BC_all, file="glmer_BC_all.RData")
@@ -2129,11 +2129,11 @@ pos_test_set <- mf_treat_without_init_infect %>%
 samps_glmer_BC_all$beta %>%
     as.data.frame() %>%
     rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    mutate(Anbo=inv_logit(mu(Anbo, samps_glmer_BC_all$aux))
-           ,Anma=inv_logit(mu(Anma, samps_glmer_BC_all$aux))
-           ,Lica=inv_logit(mu(Lica, samps_glmer_BC_all$aux))
-           ,Lipi=inv_logit(mu(Lipi, samps_glmer_BC_all$aux))
-           ,Osse=inv_logit(mu(Osse, samps_glmer_BC_all$aux))) %>%
+    mutate(Anbo=inv_logit(Anbo)
+           ,Anma=inv_logit(Anma)
+           ,Lica=inv_logit(Lica)
+           ,Lipi=inv_logit(Lipi)
+           ,Osse=inv_logit(Osse)) %>%
     dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
@@ -2203,18 +2203,38 @@ all_p_infected <- pos_exp_indiv %>%
 
 ##### PERCENT INHIBITORY #####
 
-inhibBin <- cbind(inhibCount=mf_all_noinfect$inhibCounts, noninhibCount=mf_all_noinfect$n)
+# inhibBin <- cbind(inhibCount=mf_all_noinfect$inhibCounts, noninhibCount=mf_all_noinfect$n)
 
 if ( FALSE) {
-    glmer_percInhib_all <- stan_glmer(inhibBin ~ -1 + species + (1|toadID) +(1|SampleID)
+    glmer_percInhib_all <- stan_glmer(percInhib ~ -1 + species + (1|toadID)
                                   , data=mf_all_noinfect
-                                  , family = 'binomial'
-                                  , seed= 9837423)
+                                  , family =mgcv::betar
+                                  , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                                  , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
+                                  , seed= 9837423
+    )
     save(glmer_percInhib_all, file="glmer_percInhib_all.RData")
 } else {
     load("glmer_percInhib_all.RData")
 }
 prior_summary(glmer_percInhib_all)
+
+# rbeta has a strange parameterization using a nd b so need to convert mu and phi to this.
+a <- function(mu,phi){
+    mu*phi
+}
+b <- function(mu,phi) {
+    phi-mu*phi
+}
+mu <- function(a,phi) {
+    a/phi
+}
+inv_logit <- function(x) {
+    exp(x)/(exp(x)+1)
+}
+logit <- function(p) {
+    log(p/(1-p))
+}
 
 # Look at distributions according to models
 samps_glmer_percInhib_all<- rstan::extract(glmer_percInhib_all$stanfit)
@@ -2223,11 +2243,11 @@ pos_test_set <- mf_treat_without_init_infect %>%
 samps_glmer_percInhib_all$beta %>%
     as.data.frame() %>%
     rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    mutate(Anbo=inv_logit(Anbo)
-           ,Anma=inv_logit(Anma)
-           ,Lica=inv_logit(Lica)
-           ,Lipi=inv_logit(Lipi)
-           ,Osse=inv_logit(Osse)) %>%
+    mutate(Anbo=inv_logit((Anbo))
+           ,Anma=inv_logit((Anma))
+           ,Lica=inv_logit((Lica))
+           ,Lipi=inv_logit((Lipi))
+           ,Osse=inv_logit((Osse))) %>%
     dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=percInhib) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
@@ -2235,16 +2255,11 @@ samps_glmer_percInhib_all$beta %>%
     geom_point(data=mf_all_noinfect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pos_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 
-
-# indiv_mu <- ranef(glmer_percInhib_all)$toadID
-# sp_mu <- fixef(glmer_BC)
 toad_intercept <- ranef(glmer_percInhib_all)$toadID
-sample_intercept <- ranef(glmer_percInhib_all)$SampleID
-
-samp_toad <- samps_glmer_percInhib_all$b[,(nrow(sample_intercept)+2):(nrow(sample_intercept)+1+nrow(toad_intercept))]
+samp_toad <- samps_glmer_percInhib_all$b[,1:nrow(toad_intercept)]
 colnames(samp_toad) <- rownames(toad_intercept)
-
-sample_sigma <- sd(samps_glmer_percInhib_all$b[,nrow(sample_intercept)+1])
+# toadID_sigma <- sd(samps_glmer_BC_all$b[,ncol(samps_glmer_BC_all$b)])
+phi <- samps_glmer_percInhib_all$aux
 
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals (different here bc some individuals don't have bray-curtis values)
@@ -2257,41 +2272,39 @@ species_key <- treat_indiv %>%
     separate(toadID,into=c("species","indiv"), remove=FALSE)
 species_order <- levels(as.factor(mf_all_noinfect$species))
 
-mu_exp_distr <- as.data.frame(matrix(ncol=length(treat_indiv), nrow=4000, dimnames = list(1:4000, treat_indiv)))
+exp_distr <- as.data.frame(matrix(ncol=length(treat_indiv), nrow=4000, dimnames = list(1:4000, treat_indiv)))
 for ( num_indiv in 1:length(treat_indiv)) {
     indiv <- treat_indiv[num_indiv]
     sp <- pull(species_key[num_indiv,"species"])
     num_sp <- match(sp, species_order)
     
-    mu_exp_distr[,num_indiv] <- inv_logit(rnorm(4000, mean=samps_glmer_percInhib_all$beta[,num_sp] + samp_toad[,indiv], sd=sample_sigma))
-    
+    mu <- inv_logit(samps_glmer_percInhib_all$beta[,num_sp]+samp_toad[,indiv])
+    exp_distr[,num_indiv] <- rbeta(4000
+                                   ,shape1=a(mu,samps_glmer_percInhib_all$aux)
+                                   ,shape2=b(mu,samps_glmer_percInhib_all$aux))
 }
 
 pos_exp_indiv <- mf_treat_without_init_infect %>%
-    filter(time>5) %>%
-    dplyr::select(toadID, time, species, percInhib, inhibCounts,n, eBD_log) %>%
-    mutate(p_percInhib=NA)
+    filter(time>5, !is.na(percInhib), toadID %in% colnames(samp_toad)) %>%
+    dplyr::select(toadID, time, species, percInhib, eBD_log) %>%
+    mutate(p_pinhib=NA)
 for ( r in 1:nrow(pos_exp_indiv)) {
-    temp_samp <- rbinom(n=4000, size=pos_exp_indiv[r,"n"], prob = mu_exp_distr[,pos_exp_indiv$toadID[r]])
-    
-    pos_exp_indiv[r,"p_percInhib"] <- sum(temp_samp < pos_exp_indiv[r,"inhibCounts"])/4000
+    pos_exp_indiv[r,"p_percInhib"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"percInhib"])/4000
 }
 
-
-
-gg_percInhib_pos_p <- pos_exp_indiv %>%
+gg_percInhibd_pos_p <- pos_exp_indiv %>%
     ggplot(aes(x=p_percInhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-gg_percInhib_pos_raw <- pos_exp_indiv %>%
+gg_percInhibd_pos_raw <- pos_exp_indiv %>%
     ggplot(aes(x=percInhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3, position=position_jitter(height=0.15))+
     geom_smooth(aes(col=species), method="lm",se=FALSE) +
     geom_smooth(method="lm", se=FALSE, col="black")
-grid.arrange(gg_percInhib_pos_p, gg_percInhib_pos_raw, nrow=1)
+grid.arrange(gg_percInhibd_pos_p, gg_percInhibd_pos_raw, nrow=1)
 
-mu_exp_distr %>%
+exp_distr %>%
     gather(key=toadID, value=percInhib) %>%
     ggplot(aes(x=toadID, y=percInhib)) +
     geom_violin() +
@@ -2300,8 +2313,6 @@ mu_exp_distr %>%
 all_p_infected <- pos_exp_indiv %>%
     dplyr::select(toadID, time, percInhib, p_percInhib) %>%
     full_join(all_p_infected, by=c("toadID","time"))
-
-
 
 ######## INHIB RICHNESS ############
 

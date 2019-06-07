@@ -1,7 +1,7 @@
 Statistical Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Thu Jun 6 18:05:48 2019
+Thu Jun 6 18:45:15 2019
 
 ``` r
 # Load packages
@@ -192,11 +192,11 @@ does_comp_differ_btwn_sp_and_across_time_and_infect_treat
     ##                    Df SumOfSqs       F Pr(>F)    
     ## species             4   344.67 43.6313  0.001 ***
     ## time                1    24.55 12.4311  0.001 ***
-    ## PABD                1     5.91  2.9942  0.010 ** 
+    ## PABD                1     5.91  2.9942  0.007 ** 
     ## species:time        4    28.21  3.5707  0.001 ***
-    ## species:PABD        3     6.42  1.0835  0.355    
+    ## species:PABD        3     6.42  1.0835  0.312    
     ## time:PABD           1     9.80  4.9597  0.001 ***
-    ## species:time:PABD   2     5.67  1.4353  0.123    
+    ## species:time:PABD   2     5.67  1.4353  0.120    
     ## Residual          180   355.48                   
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -1054,7 +1054,7 @@ all_p %>%
 ```
 
 (2a) Does dispersion of microbiome influence BD infection rate?
-Here we look at average distance travelled (bray-curtis) between samples prior to being infected. We see if it is correlated to infection risk.
+Here we look at average distance to centroid (bray-curtis) between samples prior to being infected at same time point. We see if it is correlated to infection risk.
 
 ``` r
 # 
@@ -1594,13 +1594,11 @@ anova(lm_pbc_PABD)
     ## Analysis of Variance Table
     ## 
     ## Response: p_BC
-    ##               Df  Sum Sq  Mean Sq F value   Pr(>F)   
-    ## species        4  1.1286 0.282160  3.6060 0.007783 **
-    ## PABD           1  0.1805 0.180477  2.3065 0.130984   
-    ## species:PABD   3  0.0662 0.022066  0.2820 0.838330   
-    ## Residuals    147 11.5025 0.078248                    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##               Df  Sum Sq  Mean Sq F value Pr(>F)
+    ## species        4  0.5543 0.138579  1.5405 0.1935
+    ## PABD           1  0.1252 0.125163  1.3913 0.2401
+    ## species:PABD   3  0.0855 0.028503  0.3168 0.8132
+    ## Residuals    147 13.2239 0.089959
 
 ``` r
 Anova(lm_pbc_PABD)
@@ -1612,13 +1610,11 @@ Anova(lm_pbc_PABD)
     ## Anova Table (Type II tests)
     ## 
     ## Response: p_BC
-    ##               Sum Sq  Df F value   Pr(>F)   
-    ## species       1.1862   4  3.7899 0.005795 **
-    ## PABD          0.1805   1  2.3065 0.130984   
-    ## species:PABD  0.0662   3  0.2820 0.838330   
-    ## Residuals    11.5025 147                    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##               Sum Sq  Df F value Pr(>F)
+    ## species       0.6013   4  1.6712 0.1597
+    ## PABD          0.1252   1  1.3913 0.2401
+    ## species:PABD  0.0855   3  0.3168 0.8132
+    ## Residuals    13.2239 147
 
 ``` r
 all_p_infected %>%
@@ -1656,13 +1652,11 @@ anova(lm_pbc_eBD)
     ## Analysis of Variance Table
     ## 
     ## Response: p_BC
-    ##                  Df  Sum Sq  Mean Sq F value   Pr(>F)   
-    ## species           4  1.1286 0.282160  3.6068 0.007773 **
-    ## eBD_log           1  0.1494 0.149400  1.9097 0.169090   
-    ## species:eBD_log   3  0.0998 0.033267  0.4252 0.735192   
-    ## Residuals       147 11.5000 0.078231                    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##                  Df  Sum Sq  Mean Sq F value Pr(>F)
+    ## species           4  0.5543 0.138579  1.5392 0.1938
+    ## eBD_log           1  0.0610 0.061046  0.6780 0.4116
+    ## species:eBD_log   3  0.1389 0.046306  0.5143 0.6730
+    ## Residuals       147 13.2347 0.090032
 
 ``` r
 Anova(lm_pbc_eBD)
@@ -1674,13 +1668,11 @@ Anova(lm_pbc_eBD)
     ## Anova Table (Type II tests)
     ## 
     ## Response: p_BC
-    ##                  Sum Sq  Df F value   Pr(>F)   
-    ## species          1.1259   4  3.5979 0.007884 **
-    ## eBD_log          0.1494   1  1.9097 0.169090   
-    ## species:eBD_log  0.0998   3  0.4252 0.735192   
-    ## Residuals       11.5000 147                    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ##                  Sum Sq  Df F value Pr(>F)
+    ## species          0.5584   4  1.5505 0.1907
+    ## eBD_log          0.0610   1  0.6780 0.4116
+    ## species:eBD_log  0.1389   3  0.5143 0.6730
+    ## Residuals       13.2347 147
 
 ``` r
 all_p_infected %>%
@@ -1847,11 +1839,11 @@ anova(lm_pinhibRich_PABD)
     ## Analysis of Variance Table
     ## 
     ## Response: p_inhibRich
-    ##               Df  Sum Sq Mean Sq F value   Pr(>F)    
-    ## species        4  4.2401 1.06001 16.8797 7.68e-12 ***
-    ## PABD           1  0.0130 0.01304  0.2076   0.6492    
-    ## species:PABD   3  0.1591 0.05305  0.8448   0.4710    
-    ## Residuals    188 11.8061 0.06280                     
+    ##               Df  Sum Sq Mean Sq F value    Pr(>F)    
+    ## species        4  4.2297 1.05742 16.8714 7.772e-12 ***
+    ## PABD           1  0.0142 0.01422  0.2268    0.6344    
+    ## species:PABD   3  0.1544 0.05147  0.8212    0.4836    
+    ## Residuals    188 11.7830 0.06268                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1865,11 +1857,11 @@ Anova(lm_pinhibRich_PABD)
     ## Anova Table (Type II tests)
     ## 
     ## Response: p_inhibRich
-    ##               Sum Sq  Df F value    Pr(>F)    
-    ## species       3.6398   4 14.4900 2.478e-10 ***
-    ## PABD          0.0130   1  0.2076    0.6492    
-    ## species:PABD  0.1591   3  0.8448    0.4710    
-    ## Residuals    11.8061 188                      
+    ##               Sum Sq  Df F value  Pr(>F)    
+    ## species       3.6312   4 14.4841 2.5e-10 ***
+    ## PABD          0.0142   1  0.2268  0.6344    
+    ## species:PABD  0.1544   3  0.8212  0.4836    
+    ## Residuals    11.7830 188                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1893,10 +1885,10 @@ anova(lm_ppercInhib_PABD)
     ## 
     ## Response: p_percInhib
     ##               Df  Sum Sq Mean Sq F value    Pr(>F)    
-    ## species        4  3.7108 0.92771  9.3972 6.036e-07 ***
-    ## PABD           1  0.1171 0.11712  1.1863    0.2775    
-    ## species:PABD   3  0.3581 0.11938  1.2093    0.3077    
-    ## Residuals    188 18.5597 0.09872                      
+    ## species        4  3.7660 0.94149 11.2213 3.475e-08 ***
+    ## PABD           1  0.1803 0.18028  2.1487    0.1444    
+    ## species:PABD   3  0.3815 0.12716  1.5156    0.2119    
+    ## Residuals    188 15.7735 0.08390                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1911,10 +1903,10 @@ Anova(lm_ppercInhib_PABD)
     ## 
     ## Response: p_percInhib
     ##               Sum Sq  Df F value    Pr(>F)    
-    ## species       3.8237   4  9.6831 3.841e-07 ***
-    ## PABD          0.1171   1  1.1863    0.2775    
-    ## species:PABD  0.3581   3  1.2093    0.3077    
-    ## Residuals    18.5597 188                      
+    ## species       3.8756   4 11.5481 2.099e-08 ***
+    ## PABD          0.1803   1  2.1487    0.1444    
+    ## species:PABD  0.3815   3  1.5156    0.2119    
+    ## Residuals    15.7735 188                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1964,10 +1956,10 @@ Anova(lm_pinhibRich_eBD)
     ## 
     ## Response: p_inhibRich
     ##                  Sum Sq  Df F value    Pr(>F)    
-    ## species          3.3575   4 13.4111 1.236e-09 ***
-    ## eBD_log          0.0258   1  0.4126    0.5214    
-    ## species:eBD_log  0.1859   3  0.9899    0.3987    
-    ## Residuals       11.7666 188                      
+    ## species          3.3503   4 13.4053 1.247e-09 ***
+    ## eBD_log          0.0274   1  0.4377    0.5090    
+    ## species:eBD_log  0.1780   3  0.9496    0.4178    
+    ## Residuals       11.7463 188                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1987,11 +1979,11 @@ anova(lm_ppercInhib_eBD)
     ## Analysis of Variance Table
     ## 
     ## Response: p_percInhib
-    ##                  Df  Sum Sq Mean Sq F value   Pr(>F)    
-    ## species           4  3.7108 0.92771  9.4290 5.74e-07 ***
-    ## eBD_log           1  0.4012 0.40119  4.0775  0.04488 *  
-    ## species:eBD_log   3  0.1366 0.04554  0.4629  0.70854    
-    ## Residuals       188 18.4972 0.09839                     
+    ##                  Df  Sum Sq Mean Sq F value    Pr(>F)    
+    ## species           4  3.7660 0.94149 11.2304 3.426e-08 ***
+    ## eBD_log           1  0.4106 0.41064  4.8982   0.02809 *  
+    ## species:eBD_log   3  0.1639 0.05464  0.6518   0.58276    
+    ## Residuals       188 15.7607 0.08383                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2006,10 +1998,10 @@ Anova(lm_ppercInhib_eBD, type = 2)
     ## 
     ## Response: p_percInhib
     ##                  Sum Sq  Df F value    Pr(>F)    
-    ## species          4.0643   4 10.3270 1.397e-07 ***
-    ## eBD_log          0.4012   1  4.0775   0.04488 *  
-    ## species:eBD_log  0.1366   3  0.4629   0.70854    
-    ## Residuals       18.4972 188                      
+    ## species          4.0501   4 12.0777 9.313e-09 ***
+    ## eBD_log          0.4106   1  4.8982   0.02809 *  
+    ## species:eBD_log  0.1639   3  0.6518   0.58276    
+    ## Residuals       15.7607 188                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

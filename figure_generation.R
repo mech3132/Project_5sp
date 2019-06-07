@@ -561,7 +561,6 @@ gg_instab_fit <- mf_con_without_init_infect %>%
 
 ## InhibRich
 
-?fitdistr
 inhibRich.normfit <- fitdistr(x=mf_con_without_init_infect$inhibRich[!is.na(mf_con_without_init_infect$inhibRich)], densfun = "normal")
 inhibRich.posfit <- fitdistr(x=mf_con_without_init_infect$inhibRich[!is.na(mf_con_without_init_infect$inhibRich)], densfun = "Poisson")
 x.pred <- round(seq(min(mf_con_without_init_infect$inhibRich, na.rm = TRUE)-sd(mf_con_without_init_infect$inhibRich, na.rm = TRUE)
@@ -576,4 +575,26 @@ gg_inhibRich_fit <- mf_con_without_init_infect %>%
     geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
     geom_line(data=data.frame(x=x.pred, y=y.expect.pois), aes(x=x, y=y), col="purple") 
 
+## percInhib
 
+percInhib.normfit <- fitdistr(x=mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "normal")
+percInhib.binfit <- sum(mf_con_without_init_infect$inhibCounts, na.rm=TRUE)/sum(mf_con_without_init_infect$n, na.rm=TRUE)
+
+x.pred <- seq(0
+                    , min(max(mf_con_without_init_infect$percInhib, na.rm = TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm = TRUE),1)
+                    , length.out = 100)
+x.pred.bin <- seq(0
+              , min(max(mf_con_without_init_infect$percInhib, na.rm = TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm = TRUE),1)*100
+              , by=1)
+y.expect.norm <- dnorm(x=x.pred, mean=percInhib.normfit$estimate[1], sd=percInhib.normfit$estimate[2])
+y.expect.bin <- dbinom(x=x.pred.bin*100, size=100, prob = percInhib.binfit)
+
+
+random.bin <- rbinom(n=length(mf_con_without_init_infect$n)*100, size=rep(mf_con_without_init_infect$n, 100), prob=percInhib.binfit)/rep(mf_con_without_init_infect$n, 100)
+
+# gg_percInhib_fit <- 
+    mf_con_without_init_infect %>%
+    ggplot(aes(x=percInhib, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
+    geom_density(data=data.frame(hist=random.bin), aes(x=hist, y=..density..), col="blue", ) 

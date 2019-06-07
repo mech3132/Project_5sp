@@ -463,8 +463,8 @@ all_p %>%
 #### PABD and dispersion ####
 
 #' (2a) Does dispersion of microbiome influence BD infection rate?\
-#' Here we look at average distance travelled (bray-curtis) between samples
-#' prior to being infected. We see if it is correlated to infection risk.
+#' Here we look at average distance to centroid (bray-curtis) between samples
+#' prior to being infected at same time point. We see if it is correlated to infection risk.
 # 
 # glm_PABD_bc <- glm(PABD ~ species*exp_mu, data=all_p, family=binomial)
 # Anova(glm_PABD_bc)
@@ -554,6 +554,7 @@ all_p %>%
 #     geom_point(aes(col=species), cex=3)
 
 #' Now let's do percent inhibitory
+#' \
 # lm_eBD_percInhib <- lm(eBD_log ~  species*exp_pinhib, data=all_p)
 # Anova(lm_eBD_percInhib)
 # all_p %>%
