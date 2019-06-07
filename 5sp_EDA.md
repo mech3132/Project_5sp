@@ -1,7 +1,7 @@
 Exploratory Data Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Thu May 23 14:00:34 2019
+Thu Jun 6 18:01:07 2019
 
 First, load required packages
 -----------------------------
@@ -1747,14 +1747,16 @@ if ( FALSE) {
     glmer_BC <- stan_glmer(distance_bray_curtis ~ -1 + species + (1|toadID)
                            , data=mf_con_without_init_infect
                            , family =mgcv::betar
-                           , prior_intercept = normal(location = 0.5,scale = 0.1, autoscale = TRUE)
-                           , prior = normal(location=0.5, scale=0.1, autoscale=TRUE)
+                           , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
                            , seed= 623445
     )
     save(glmer_BC, file="glmer_BC.RData")
     } else {
         load("glmer_BC.RData")
     }
+
+
 prior_summary(glmer_BC)
 ```
 
@@ -1762,7 +1764,7 @@ prior_summary(glmer_BC)
     ## ------
     ## 
     ## Coefficients
-    ##  ~ normal(location = [0.5,0.5,0.5,...], scale = [0.1,0.1,0.1,...])
+    ##  ~ normal(location = [0.5,0.5,0.5,...], scale = [2.5,2.5,2.5,...])
     ## 
     ## Covariance
     ##  ~ decov(reg. = 1, conc. = 1, shape = 1, scale = 1)
@@ -1795,11 +1797,11 @@ pre_test_set <- mf_treat_without_init_infect %>%
 samps_glmer_BC$beta %>%
     as.data.frame() %>%
     rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    mutate(Anbo=inv_logit(mu(Anbo, samps_glmer_BC$aux))
-           ,Anma=inv_logit(mu(Anma, samps_glmer_BC$aux))
-           ,Osse=inv_logit(mu(Osse, samps_glmer_BC$aux))
-           ,Lica=inv_logit(mu(Lica, samps_glmer_BC$aux))
-           ,Lipi=inv_logit(mu(Lipi, samps_glmer_BC$aux))) %>%
+    mutate(Anbo=inv_logit(Anbo)
+           ,Anma=inv_logit(Anma)
+           ,Osse=inv_logit(Osse)
+           ,Lica=inv_logit(Lica)
+           ,Lipi=inv_logit(Lipi)) %>%
     dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
@@ -1880,6 +1882,21 @@ for ( i in treat_indiv ) {
 pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
+exp_distr %>%
+    gather(key="species",value="d") %>%
+    ggplot(aes(x=species, y=d)) +
+    geom_violin() +
+    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_mu), col="red", position=position_jitter(width=0.1, height=0)) +
+    geom_point(data=mf_con_without_init_infect, aes(x=species, y=distance_bray_curtis), col="blue", position=position_jitter(width=0.1, height=0))
+```
+
+    ## Warning: Removed 2 rows containing missing values (geom_point).
+
+    ## Warning: Removed 38 rows containing missing values (geom_point).
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-2.png)
+
+``` r
 # Plot results 
 gg_beta_p <- pre_exp_indiv %>%
     filter(!is.na(exp_mu)) %>%
@@ -1897,16 +1914,17 @@ gg_beta_raw <- pre_exp_indiv %>%
 grid.arrange(gg_beta_p, gg_beta_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-2.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-3.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_mu, p_mu) %>%
     full_join(all_p, by="toadID")
 
-#### PERCENT INHIBITORY ####
-x.fit.percInhib <- round(seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
-                       , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100), digits = 2)
+
+#### PERCENT INHIBITORY BETA ####
+x.fit.percInhib <- seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
+                             , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100)
 percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "beta", start=list(shape1=1, shape2=6))
 # percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "gamma", start=list(shape=1, rate=8))
 y.pred.percInhib <- dbeta(x.fit.percInhib, shape1=percInhib.fit$estimate[1], shape2=percInhib.fit$estimate[2])
@@ -1919,7 +1937,7 @@ mf_con_without_init_infect %>%
     geom_line(data=data.frame(x=x.fit.percInhib, y=y.pred.percInhib), aes(x=x,y=y), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-3.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-4.png)
 
 ``` r
 mf_con_without_init_infect %>%
@@ -1929,7 +1947,7 @@ mf_con_without_init_infect %>%
     facet_grid(~species)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-4.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-5.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -1951,7 +1969,7 @@ gg_perctime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_perctime_con, gg_perctime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-5.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-6.png)
 
 ``` r
 # Does percent inhibitory change with species or time?
@@ -2029,20 +2047,22 @@ Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_i
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-We see that beta diversity is fairly normal, but we probably want to use binomial since it's a proportion. Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable to find out the average beta diversity turnover for each species and for each individual through time.
-u ~ BIN(u\_i, sigma\_i)
-u\_i = a\_j
+We see that beta diversity is fairly normal. Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable to find out the average beta diversity turnover for each species and for each individual through time.
+u ~ BETA(s1\_i, s1\_i)
+s1\_i = a\_j
 a\_j ~ N(u\_sp, sigma\_sp)
-where i = sample, j = individual, sp = species Below, we use the dataset with JUST the controls.
+s2\_i = b\_j
+b\_j ~ N(u\_sp, sigma\_sp)  where i = sample, j = individual, sp = species Below, we use the dataset with JUST the controls.
 
 ``` r
-inhibBin <- cbind(inhibCount=mf_con_without_init_infect$inhibCounts, noninhibCount=mf_con_without_init_infect$n)
-
 if ( FALSE) {
-    glmer_percInhib <- stan_glmer(inhibBin ~ -1 + species + (1|toadID)
+    glmer_percInhib <- stan_glmer(percInhib ~ -1 + species + (1|toadID)
                            , data=mf_con_without_init_infect
-                           , family = 'binomial'
-                           , seed= 9837423)
+                           , family =mgcv::betar
+                           , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
+                           , seed= 54392
+    )
     save(glmer_percInhib, file="glmer_percInhib.RData")
 } else {
     load("glmer_percInhib.RData")
@@ -2054,7 +2074,7 @@ prior_summary(glmer_percInhib)
     ## ------
     ## 
     ## Coefficients
-    ##  ~ normal(location = [0,0,0,...], scale = [2.5,2.5,2.5,...])
+    ##  ~ normal(location = [0.5,0.5,0.5,...], scale = [2.5,2.5,2.5,...])
     ## 
     ## Covariance
     ##  ~ decov(reg. = 1, conc. = 1, shape = 1, scale = 1)
@@ -2062,6 +2082,23 @@ prior_summary(glmer_percInhib)
     ## See help('prior_summary.stanreg') for more details
 
 ``` r
+# rbeta has a strange parameterization using a nd b so need to convert mu and phi to this.
+a <- function(mu,phi){
+    mu*phi
+}
+b <- function(mu,phi) {
+    phi-mu*phi
+}
+mu <- function(a,phi) {
+    a/phi
+}
+inv_logit <- function(x) {
+    exp(x)/(exp(x)+1)
+}
+logit <- function(p) {
+    log(p/(1-p))
+}
+
 # Look at distributions according to models
 samps_glmer_percInhib<- rstan::extract(glmer_percInhib$stanfit)
 pre_test_set <- mf_treat_without_init_infect %>%
@@ -2074,7 +2111,7 @@ samps_glmer_percInhib$beta %>%
            ,Osse=inv_logit(Osse)
            ,Lica=inv_logit(Lica)
            ,Lipi=inv_logit(Lipi)) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi, Osse) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=percInhib) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
@@ -2085,44 +2122,177 @@ samps_glmer_percInhib$beta %>%
 ![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-1.png)
 
 ``` r
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
-
-
-
-# indiv_mu <- ranef(glmer_percInhib)$toadID
-# sp_mu <- fixef(glmer_BC)
+# Get standard deviation between toad individuals and samples
+# samp_sigma <- sigma(glmer_BC)
 toadID_sigma <- sd(samps_glmer_percInhib$b[,ncol(samps_glmer_percInhib$b)])
+phi <- samps_glmer_percInhib$aux
 
-# instead of predicted distr, we get predicted mu 
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
 # List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
-# Get predicted distribuion
-mu_exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+
+exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-    # mu_exp_distr[,num_sp] <- rbinom(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
-    mu_exp_distr[,num_sp] <- rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
+    mu <- inv_logit(rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma))
+    # exp_distr[,nump_sp] <- mu
+    exp_distr[,num_sp] <- rbeta(length(samps_glmer_percInhib$beta[,num_sp])
+                                ,shape1=a(mu,samps_glmer_percInhib$aux)
+                                ,shape2=b(mu,samps_glmer_percInhib$aux))
+    
+    # exp_distr[,num_sp] <- rnorm(length(samps_glmer_BC$beta[,num_sp]), mean=rnorm(length(samps_glmer_BC$beta[,num_sp]), mean=samps_glmer_BC$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
 }
 
 
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
 # Loop through and calculate probability of having diversity at that level
 pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_pinhib=rep(NA, length(treat_indiv)), p_pinhib=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
 for ( i in treat_indiv ) {
     n_row <- match(i, treat_indiv)
     sp <- unlist(strsplit(i,"_"))
     num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
-    temp_p <- mf_treat_without_init_infect %>%
+    temp_percInhib <- mf_treat_without_init_infect %>%
         filter(toadID==i, time <=5 ) %>%
         filter(!is.na(percInhib))%>%
         filter(!is.na(n))%>%
         dplyr::select(percInhib) %>%
         pull()
-    temp_size <- mf_treat_without_init_infect %>%
-        filter(toadID==i, time <=5 ) %>%
-        filter(!is.na(percInhib))%>%
-        filter(!is.na(n))%>%
-        dplyr::select(n) %>%
-        pull()
     
+    if ( length(temp_percInhib) > 1) {
+        exp_mu <-  fitdistr(temp_percInhib, "normal")$estimate[1]
+        # exp_mu <-  fitdistr(temp_bc, "beta", start=list(shape1=0.1, shape2=0.1))$estimate[1]
+    } else if ( length(temp_percInhib) == 1) {
+        exp_mu <- temp_percInhib
+    } else {
+        exp_mu <- NA
+    }
+    
+    # dm is distance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
+    p_mu <- sum(exp_distr[,sp[1]]<exp_mu, na.rm=TRUE)/length(exp_distr[,sp[1]])
+    
+    ### Did they get infected?
+    infect <- max(mf_treat_without_init_infect %>%
+                      filter(toadID==i) %>%
+                      dplyr::select(eBD_raw) %>%
+                      pull()
+    )
+    
+    pre_exp_indiv[n_row,c("exp_pinhib","p_pinhib","infect")] <- c(exp_mu, p_mu, infect)
+    
+}
+# create species column
+pre_exp_indiv <- pre_exp_indiv %>%
+    separate(toadID, into=c("species","indiv"), remove = FALSE)
+
+exp_distr %>%
+    gather(key="species",value="d") %>%
+    ggplot(aes(x=species, y=d)) +
+    geom_violin() +
+    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib), col="red", position=position_jitter(width=0.1, height=0)) +
+    geom_point(data=mf_con_without_init_infect, aes(x=species, y=percInhib), col="blue", position=position_jitter(width=0.1, height=0))
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-2.png)
+
+``` r
+# Plot results 
+gg_pinhib_p <- pre_exp_indiv %>%
+    filter(!is.na(p_pinhib)) %>%
+    ggplot(aes(x=p_pinhib, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4) 
+# Raw numbers
+gg_pinhib_raw <- pre_exp_indiv %>%
+    filter(!is.na(exp_pinhib)) %>%
+    ggplot(aes(x=exp_pinhib, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4)
+grid.arrange(gg_pinhib_p, gg_pinhib_raw, nrow=1)
+```
+
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-3.png)
+
+``` r
+all_p <- pre_exp_indiv %>%
+    dplyr::select(toadID, exp_pinhib, p_pinhib) %>%
+    full_join(all_p, by="toadID")
+```
+
+#### PERCENT INHIBITORY
+
+x.fit.percInhib &lt;- round(seq(max(min(mf\_con\_without\_init\_infect*p**e**r**c**I**n**h**i**b*, *n**a*.*r**m* = *T**R**U**E*)−*s**d*(*m**f*<sub>*c*</sub>*o**n*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*percInhib, na.rm=TRUE),0) , max(mf\_con\_without\_init\_infect*p**e**r**c**I**n**h**i**b*, *n**a*.*r**m* = *T**R**U**E*)+*s**d*(*m**f*<sub>*c*</sub>*o**n*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*percInhib, na.rm=TRUE), length.out = 100), digits = 2) percInhib.fit &lt;- fitdistr(mf\_con\_without\_init\_infect*p**e**r**c**I**n**h**i**b*\[!*i**s*.*n**a*(*m**f*<sub>*c*</sub>*o**n*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*percInhib)\], densfun = "beta", start=list(shape1=1, shape2=6)) \# percInhib.fit &lt;- fitdistr(mf\_con\_without\_init\_infect*p**e**r**c**I**n**h**i**b*\[!*i**s*.*n**a*(*m**f*<sub>*c*</sub>*o**n*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*percInhib)\], densfun = "gamma", start=list(shape=1, rate=8)) y.pred.percInhib &lt;- dbeta(x.fit.percInhib, shape1=percInhib.fit*e**s**t**i**m**a**t**e*\[1\],*s**h**a**p**e*2 = *p**e**r**c**I**n**h**i**b*.*f**i**t*estimate\[2\]) \# y.pred.percInhib &lt;- dgamma(x.fit.percInhib, shape=percInhib.fit*e**s**t**i**m**a**t**e*\[1\],*r**a**t**e* = *p**e**r**c**I**n**h**i**b*.*f**i**t*estimate\[2\])
+
+mf\_con\_without\_init\_infect %&gt;% filter(!is.na(percInhib)) %&gt;% ggplot(aes(y=..density.., x=percInhib)) + geom\_histogram(bins=20) + geom\_line(data=data.frame(x=x.fit.percInhib, y=y.pred.percInhib), aes(x=x,y=y), col="red") mf\_con\_without\_init\_infect %&gt;% filter(!is.na(percInhib)) %&gt;% ggplot(aes(x=percInhib)) + geom\_histogram(aes(color=species), bins=20,show.legend = FALSE) + facet\_grid(~species) \# Check to see if turnover is changing with time significantly gg\_perctime\_con &lt;- mf\_con\_without\_init\_infect %&gt;% filter(!is.na(percInhib)) %&gt;% ggplot(aes(x=time, y=percInhib)) + geom\_line(aes(group=toadID)) + geom\_point(aes(col=PABD)) + scale\_color\_manual(values=c("blue","red"))+ facet\_grid(~species) gg\_perctime\_treat &lt;- mf\_treat\_without\_init\_infect %&gt;% filter(!is.na(percInhib)) %&gt;% ggplot(aes(x=time, y=percInhib)) + geom\_line(aes(group=toadID)) + geom\_point(aes(col=PABD)) + geom\_vline(aes(xintercept=5.5))+ scale\_color\_manual(values=c("blue","red"))+ facet\_grid(~species) grid.arrange(gg\_perctime\_con, gg\_perctime\_treat, nrow=2)
+
+Does percent inhibitory change with species or time?
+====================================================
+
+Type I ANOVA (to test for interaction) in control group?
+========================================================
+
+anova(glm(percInhib ~ species\*time, family = binomial(), data=mf\_con\_without\_init\_infect, weights=mf\_con\_without\_init\_infect$n), test = "Chisq") \# Type III ANOVA (to test for main effects, given interaction) in control group? Anova(glm(percInhib ~ species\*time, family = binomial(), data=mf\_con\_without\_init\_infect, weights=mf\_con\_without\_init\_infect$n, contrasts=list(species=contr.sum)), type=3)
+
+Does percent inhibitory change with species or time in treatment group?
+=======================================================================
+
+Type I ANOVA (to test for interaction) in control group?
+========================================================
+
+anova(glm(percInhib ~ species\*time, family = binomial(), data=mf\_treat\_without\_init\_infect, weights=mf\_treat\_without\_init\_infect$n), test = "Chisq") \# Type III ANOVA (to test for main effects, given interaction) in control group? Anova(glm(percInhib ~ species\*time, family = binomial(), data=mf\_treat\_without\_init\_infect, weights=mf\_treat\_without\_init\_infect$n, contrasts = list(species=contr.sum)), type=3)
+
+' We see that beta diversity is fairly normal.
+==============================================
+
+' Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable
+======================================================================================================
+
+' to find out the average beta diversity turnover for each species and for each individual through time.
+========================================================================================================
+
+'
+\#' u ~ BETA(s1\_i, s1\_i)
+\#' s1\_i = a\_j
+\#' a\_j ~ N(u\_sp, sigma\_sp)
+\#' s2\_i = b\_j
+\#' b\_j ~ N(u\_sp, sigma\_sp) 
+===============================
+
+' where i = sample, j = individual, sp = species
+================================================
+
+' Below, we use the dataset with JUST the controls.
+===================================================
+
+inhibBin &lt;- cbind(inhibCount=mf\_con\_without\_init\_infect*i**n**h**i**b**C**o**u**n**t**s*, *n**o**n**i**n**h**i**b**C**o**u**n**t* = *m**f*<sub>*c*</sub>*o**n*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*n)
+
+if ( FALSE) { glmer\_percInhib &lt;- stan\_glmer(inhibBin ~ -1 + species + (1|toadID) , data=mf\_con\_without\_init\_infect , family = 'binomial' , seed= 9837423) save(glmer\_percInhib, file="glmer\_percInhib.RData") } else { load("glmer\_percInhib.RData") } prior\_summary(glmer\_percInhib)
+
+Look at distributions according to models
+=========================================
+
+samps\_glmer\_percInhib&lt;- rstan::extract(glmer\_percInhib*s**t**a**n**f**i**t*)*p**r**e*<sub>*t*</sub>*e**s**t*<sub>*s*</sub>*e**t* &lt; −*m**f*<sub>*t*</sub>*r**e**a**t*<sub>*w*</sub>*i**t**h**o**u**t*<sub>*i*</sub>*n**i**t*<sub>*i*</sub>*n**f**e**c**t*beta %&gt;% as.data.frame() %&gt;% rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %&gt;% mutate(Anbo=inv\_logit(Anbo) ,Anma=inv\_logit(Anma) ,Osse=inv\_logit(Osse) ,Lica=inv\_logit(Lica) ,Lipi=inv\_logit(Lipi)) %&gt;% dplyr::select(Anbo,Anma,Lica,Lipi, Osse) %&gt;% gather(key=species, value=percInhib) %&gt;% ggplot(mapping=aes(x=species, y=percInhib))+ geom\_violin() + geom\_point(data=mf\_con\_without\_init\_infect, aes(y=percInhib, x=species), position = position\_jitter(width = 0.1, height=0), col="blue") + geom\_point(data=pre\_test\_set, aes(y=percInhib, x=species), position=position\_jitter(width = 0.1, height=0), col="red") \# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
+
+indiv\_mu &lt;- ranef(glmer\_percInhib)$toadID \# sp\_mu &lt;- fixef(glmer\_BC) toadID\_sigma &lt;- sd(samps\_glmer\_percInhib$b\[,ncol(samps\_glmer\_percInhib$b)\])
+=====================================================================================================================================================================
+
+instead of predicted distr, we get predicted mu
+===============================================
+
+List of each species
+====================
+
+species\_list &lt;- levels(factor(mf\_con\_without\_init\_infect$species)) \# Get predicted distribuion mu\_exp\_distr &lt;- as.data.frame(matrix(ncol=length(species\_list), nrow=4000, dimnames = list(1:4000, species\_list))) for ( num\_sp in 1:length(species\_list)) {  \# mu\_exp\_distr\[,num\_sp\] &lt;- rbinom(4000, mean=samps\_glmer\_percInhib$beta\[,num\_sp\], sd=toadID\_sigma) mu\_exp\_distr\[,num\_sp\] &lt;- rnorm(4000, mean=samps\_glmer\_percInhib$beta\[,num\_sp\], sd=toadID\_sigma) }
+
+Loop through and calculate probability of having diversity at that level
+========================================================================
+
+pre\_exp\_indiv &lt;- data.frame(toadID=treat\_indiv, exp\_pinhib=rep(NA, length(treat\_indiv)), p\_pinhib=rep(NA, length(treat\_indiv)), infect=rep(NA, length(treat\_indiv))) for ( i in treat\_indiv ) { n\_row &lt;- match(i, treat\_indiv) sp &lt;- unlist(strsplit(i,"\_")) num\_sp &lt;- match(sp\[1\], levels(factor(mf\_con\_without\_init\_infect$species))) temp\_p &lt;- mf\_treat\_without\_init\_infect %&gt;% filter(toadID==i, time &lt;=5 ) %&gt;% filter(!is.na(percInhib))%&gt;% filter(!is.na(n))%&gt;% dplyr::select(percInhib) %&gt;% pull() temp\_size &lt;- mf\_treat\_without\_init\_infect %&gt;% filter(toadID==i, time &lt;=5 ) %&gt;% filter(!is.na(percInhib))%&gt;% filter(!is.na(n))%&gt;% dplyr::select(n) %&gt;% pull()
+
         exp_pinhib <- glm(cbind(temp_p*temp_size, temp_size-temp_p*temp_size) ~ 1, family="binomial")$coefficients
         p_pinhib <- sum(mu_exp_distr[,sp[1]]<exp_pinhib)/length(mu_exp_distr[,sp[1]])
         
@@ -2135,41 +2305,18 @@ for ( i in treat_indiv ) {
         
         pre_exp_indiv[n_row,c("exp_pinhib","p_pinhib","infect")] <- c(exp_pinhib, p_pinhib, infect)
 
-    
-}
-# create species column
-pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+} \# create species column pre\_exp\_indiv &lt;- pre\_exp\_indiv %&gt;% separate(toadID, into=c("species","indiv"), remove = FALSE)
 
-# Plot results 
-gg_percInhib_p <- ggplot(pre_exp_indiv, aes(x=p_pinhib, y=log(infect+1))) +
-    geom_smooth(aes(col=species),method=lm, se=FALSE) +
-    geom_point(aes(color=species), cex=4)+
-    geom_smooth(method=lm, se=FALSE, col="black")
-gg_percInhib_raw <- ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(infect+1)))+
-    geom_smooth(aes(col=species),method=lm, se=FALSE) +
-    geom_point(aes(color=species), cex=4)+
-    geom_smooth(method=lm, se=FALSE, col="black")
-grid.arrange(gg_percInhib_p, gg_percInhib_raw, nrow=1)
-```
+Plot results
+============
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-2.png)
+gg\_percInhib\_p &lt;- ggplot(pre\_exp\_indiv, aes(x=p\_pinhib, y=log(infect+1))) + geom\_smooth(aes(col=species),method=lm, se=FALSE) + geom\_point(aes(color=species), cex=4)+ geom\_smooth(method=lm, se=FALSE, col="black") gg\_percInhib\_raw &lt;- ggplot(pre\_exp\_indiv, aes(x=inv\_logit(exp\_pinhib), y=log(infect+1)))+ geom\_smooth(aes(col=species),method=lm, se=FALSE) + geom\_point(aes(color=species), cex=4)+ geom\_smooth(method=lm, se=FALSE, col="black") grid.arrange(gg\_percInhib\_p, gg\_percInhib\_raw, nrow=1)
+
+mu\_exp\_distr %&gt;% gather(key=species, value=percInhib) %&gt;% ggplot(aes(x=species, y=percInhib)) + geom\_violin() + geom\_point(data=pre\_exp\_indiv, aes(x=species, y=exp\_pinhib, col=log(infect+1)), cex=4, position=position\_jitter(height=0, width=0.1))
+
+all\_p &lt;- pre\_exp\_indiv %&gt;% dplyr::select(toadID, exp\_pinhib, p\_pinhib) %&gt;% full\_join(all\_p, by="toadID")
 
 ``` r
-mu_exp_distr %>%
-    gather(key=species, value=percInhib) %>%
-    ggplot(aes(x=species, y=percInhib)) +
-    geom_violin() +
-    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
-```
-
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-3.png)
-
-``` r
-all_p <- pre_exp_indiv %>%
-    dplyr::select(toadID, exp_pinhib, p_pinhib) %>%
-    full_join(all_p, by="toadID")
-
 #### INHIB RICHNESS ####
 
 ### Fit a poisson and log poisson to see fit
@@ -2183,7 +2330,7 @@ ggplot(data=mf_con_without_init_infect, aes(x=(inhibRich))) +
     geom_line(data=data.frame(x=(x.fit.inhibRich), y=y.pred.inhibRich), aes(x=x,y=y), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-4.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-1.png)
 
 ``` r
 # Check to see if turnover is changing with time significantly
@@ -2205,7 +2352,7 @@ gg_inhibtime_treat <- mf_treat_without_init_infect %>%
 grid.arrange(gg_inhibtime_con, gg_inhibtime_treat, nrow=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-5.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-2.png)
 
 ``` r
 # Does proportion of inhibitory bacteria differ betwen species and time points?
@@ -2328,7 +2475,7 @@ new_samps_beta %>%
     geom_point(data=pre_test_set, aes(y=(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-6.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-3.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2418,7 +2565,7 @@ gg_inhibRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_inhibRich, y=log(infect+1)))
 grid.arrange(gg_inhibRich_p, gg_inhibRich_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-7.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-4.png)
 
 ``` r
 exp_distr %>%
@@ -2428,7 +2575,7 @@ exp_distr %>%
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_inhibRich, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-8.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-5.png)
 
 ``` r
 all_p <- pre_exp_indiv %>%
@@ -2488,7 +2635,7 @@ samps_lmer_shannon_all$beta %>%
     geom_point(data=post_test_set, aes(y=shannon, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-9.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-6.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2537,7 +2684,7 @@ gg_shan_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_shan_pos_p, gg_shan_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-10.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-7.png)
 
 ``` r
 exp_distr %>%
@@ -2547,7 +2694,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=shannon, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-11.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-8.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv
@@ -2599,7 +2746,7 @@ samps_lmer_rich_all$beta %>%
     geom_point(data=pos_test_set, aes(y=logRich, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-12.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-9.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -2647,7 +2794,7 @@ gg_logRich_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_logRich_pos_p, gg_logRich_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-13.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-10.png)
 
 ``` r
 exp_distr %>%
@@ -2657,7 +2804,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=logRich, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-14.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-11.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2720,7 +2867,7 @@ samps_glmer_dist_all$beta %>%
     geom_point(data=pos_test_set, aes(y=distance.to.centroid, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-15.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-12.png)
 
 ``` r
 toad_intercept <- ranef(glmer_dist_all)$toadID
@@ -2769,7 +2916,7 @@ gg_beta_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-16.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-13.png)
 
 ``` r
 exp_distr %>%
@@ -2779,7 +2926,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=distance.to.centroid, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-17.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-14.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2857,7 +3004,7 @@ samps_glmer_BC_all$beta %>%
 
     ## Warning: Removed 31 rows containing missing values (geom_point).
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-18.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-15.png)
 
 ``` r
 toad_intercept <- ranef(glmer_BC_all)$toadID
@@ -2910,7 +3057,7 @@ gg_beta_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_beta_pos_p, gg_beta_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-19.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-16.png)
 
 ``` r
 exp_distr %>%
@@ -2920,7 +3067,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=distance_bray_curtis, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-20.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-17.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -2976,7 +3123,7 @@ samps_glmer_percInhib_all$beta %>%
     geom_point(data=pos_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-21.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-18.png)
 
 ``` r
 # indiv_mu <- ranef(glmer_percInhib_all)$toadID
@@ -3035,7 +3182,7 @@ gg_percInhib_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_percInhib_pos_p, gg_percInhib_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-22.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-19.png)
 
 ``` r
 mu_exp_distr %>%
@@ -3045,7 +3192,7 @@ mu_exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=percInhib, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-23.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-20.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -3096,7 +3243,7 @@ samps_glmer_inhibRich_all$beta %>%
     geom_point(data=pos_test_set, aes(y=log(inhibRich), x=species), position=position_jitter(width = 0.1, height=0.05), col="red")
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-24.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-21.png)
 
 ``` r
 # Get standard deviation between toad individuals and samples
@@ -3155,7 +3302,7 @@ gg_inhibRich_pos_raw <- pos_exp_indiv %>%
 grid.arrange(gg_inhibRich_pos_p, gg_inhibRich_pos_raw, nrow=1)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-25.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-22.png)
 
 ``` r
 exp_distr %>%
@@ -3165,7 +3312,7 @@ exp_distr %>%
     geom_point(data=pos_exp_indiv, aes(x=toadID, y=inhibRich, col=eBD_log),cex=4, position=position_jitter(height=0, width=0.1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-26.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-23.png)
 
 ``` r
 all_p_infected <- pos_exp_indiv %>%
@@ -3193,7 +3340,7 @@ all_p %>%
     geom_point(aes(col=species), cex=3)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-27.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-24.png)
 
 ``` r
 # anova(lm(p_inhib ~ p_rich, data=con_exp_indiv))
@@ -3406,7 +3553,7 @@ mf_con_with_inhibOTUs %>%
     scale_fill_manual(values=set_col)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-28.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-25.png)
 
 ``` r
 #### TREATMENT ####
@@ -3443,7 +3590,7 @@ mf_treat_with_inhibOTUs %>%
     geom_vline(aes(xintercept=5.5), col="grey", lty=2)
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-29.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-26.png)
 
 ``` r
 g_legend <- function(a.gplot){ # from stack overflow
@@ -3524,7 +3671,7 @@ grid.arrange(anbo_con, anma_con, lica_con, lipi_con, osse_con
              , bottom = textGrob("Time", vjust=1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-30.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-27.png)
 
 ``` r
 # Now for treatment 
@@ -3600,7 +3747,7 @@ grid.arrange(anbo_treat, anma_treat, lica_treat, lipi_treat, osse_treat
              , bottom = textGrob("Time", vjust=1))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-25-31.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-28.png)
 
 ``` r
 ### Summraizing before and after exposure ####
@@ -3650,7 +3797,7 @@ mf_con_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-26-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-27-1.png)
 
 ``` r
 # TREAT
@@ -3700,7 +3847,7 @@ mf_treat_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-27-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-28-1.png)
 
 ``` r
 ### TEsting presence absence BD
@@ -3759,7 +3906,7 @@ mf_treat_statdiff %>%
     geom_hline(aes(yintercept=0))
 ```
 
-![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-28-1.png)
+![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-29-1.png)
 
 ``` r
 # mf_treat_with_inhibOTUs %>%

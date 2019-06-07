@@ -1149,14 +1149,16 @@ if ( FALSE) {
     glmer_BC <- stan_glmer(distance_bray_curtis ~ -1 + species + (1|toadID)
                            , data=mf_con_without_init_infect
                            , family =mgcv::betar
-                           , prior_intercept = normal(location = 0.5,scale = 0.1, autoscale = TRUE)
-                           , prior = normal(location=0.5, scale=0.1, autoscale=TRUE)
+                           , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
                            , seed= 623445
     )
     save(glmer_BC, file="glmer_BC.RData")
     } else {
         load("glmer_BC.RData")
     }
+
+
 prior_summary(glmer_BC)
 
 # rbeta has a strange parameterization using a nd b so need to convert mu and phi to this.
@@ -1184,11 +1186,11 @@ pre_test_set <- mf_treat_without_init_infect %>%
 samps_glmer_BC$beta %>%
     as.data.frame() %>%
     rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    mutate(Anbo=inv_logit(mu(Anbo, samps_glmer_BC$aux))
-           ,Anma=inv_logit(mu(Anma, samps_glmer_BC$aux))
-           ,Osse=inv_logit(mu(Osse, samps_glmer_BC$aux))
-           ,Lica=inv_logit(mu(Lica, samps_glmer_BC$aux))
-           ,Lipi=inv_logit(mu(Lipi, samps_glmer_BC$aux))) %>%
+    mutate(Anbo=inv_logit(Anbo)
+           ,Anma=inv_logit(Anma)
+           ,Osse=inv_logit(Osse)
+           ,Lica=inv_logit(Lica)
+           ,Lipi=inv_logit(Lipi)) %>%
     dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
@@ -1261,6 +1263,13 @@ for ( i in treat_indiv ) {
 pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
+exp_distr %>%
+    gather(key="species",value="d") %>%
+    ggplot(aes(x=species, y=d)) +
+    geom_violin() +
+    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_mu), col="red", position=position_jitter(width=0.1, height=0)) +
+    geom_point(data=mf_con_without_init_infect, aes(x=species, y=distance_bray_curtis), col="blue", position=position_jitter(width=0.1, height=0))
+
 # Plot results 
 gg_beta_p <- pre_exp_indiv %>%
     filter(!is.na(exp_mu)) %>%
@@ -1280,9 +1289,10 @@ all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_mu, p_mu) %>%
     full_join(all_p, by="toadID")
 
-#### PERCENT INHIBITORY ####
-x.fit.percInhib <- round(seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
-                       , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100), digits = 2)
+
+#### PERCENT INHIBITORY BETA ####
+x.fit.percInhib <- seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
+                             , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100)
 percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "beta", start=list(shape1=1, shape2=6))
 # percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "gamma", start=list(shape=1, rate=8))
 y.pred.percInhib <- dbeta(x.fit.percInhib, shape1=percInhib.fit$estimate[1], shape2=percInhib.fit$estimate[2])
@@ -1328,28 +1338,49 @@ anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_i
 # Type III ANOVA (to test for main effects, given interaction) in control group?
 Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n, contrasts = list(species=contr.sum)), type=3)
 
-#' We see that beta diversity is fairly normal, but we probably want to use binomial since it's a proportion.
+#' We see that beta diversity is fairly normal.
 #' Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable
 #' to find out the average beta diversity turnover for each species and for each individual through time.
 #' \
-#' u ~ BIN(u_i, sigma_i)\
-#' u_i = a_j\
+#' u ~ BETA(s1_i, s1_i)\
+#' s1_i = a_j\
 #' a_j ~ N(u_sp, sigma_sp)\
+#' s2_i = b_j\
+#' b_j ~ N(u_sp, sigma_sp)\ 
 #' where i = sample, j = individual, sp = species
 #' Below, we use the dataset with JUST the controls.
 
-inhibBin <- cbind(inhibCount=mf_con_without_init_infect$inhibCounts, noninhibCount=mf_con_without_init_infect$n)
 
 if ( FALSE) {
-    glmer_percInhib <- stan_glmer(inhibBin ~ -1 + species + (1|toadID)
+    glmer_percInhib <- stan_glmer(percInhib ~ -1 + species + (1|toadID)
                            , data=mf_con_without_init_infect
-                           , family = 'binomial'
-                           , seed= 9837423)
+                           , family =mgcv::betar
+                           , prior_intercept = normal(location = 0.5,scale = 2.5, autoscale = TRUE)
+                           , prior = normal(location=0.5, scale=2.5, autoscale=TRUE)
+                           , seed= 54392
+    )
     save(glmer_percInhib, file="glmer_percInhib.RData")
 } else {
     load("glmer_percInhib.RData")
 }
 prior_summary(glmer_percInhib)
+
+# rbeta has a strange parameterization using a nd b so need to convert mu and phi to this.
+a <- function(mu,phi){
+    mu*phi
+}
+b <- function(mu,phi) {
+    phi-mu*phi
+}
+mu <- function(a,phi) {
+    a/phi
+}
+inv_logit <- function(x) {
+    exp(x)/(exp(x)+1)
+}
+logit <- function(p) {
+    log(p/(1-p))
+}
 
 # Look at distributions according to models
 samps_glmer_percInhib<- rstan::extract(glmer_percInhib$stanfit)
@@ -1363,88 +1394,272 @@ samps_glmer_percInhib$beta %>%
            ,Osse=inv_logit(Osse)
            ,Lica=inv_logit(Lica)
            ,Lipi=inv_logit(Lipi)) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi, Osse) %>%
+    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
     gather(key=species, value=percInhib) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pre_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
-# legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
 
 
-
-# indiv_mu <- ranef(glmer_percInhib)$toadID
-# sp_mu <- fixef(glmer_BC)
+# Get standard deviation between toad individuals and samples
+# samp_sigma <- sigma(glmer_BC)
 toadID_sigma <- sd(samps_glmer_percInhib$b[,ncol(samps_glmer_percInhib$b)])
+phi <- samps_glmer_percInhib$aux
 
-# instead of predicted distr, we get predicted mu 
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
 # List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
-# Get predicted distribuion
-mu_exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+
+exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-    # mu_exp_distr[,num_sp] <- rbinom(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
-    mu_exp_distr[,num_sp] <- rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
+    mu <- inv_logit(rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma))
+    # exp_distr[,nump_sp] <- mu
+    exp_distr[,num_sp] <- rbeta(length(samps_glmer_percInhib$beta[,num_sp])
+                                ,shape1=a(mu,samps_glmer_percInhib$aux)
+                                ,shape2=b(mu,samps_glmer_percInhib$aux))
+    
+    # exp_distr[,num_sp] <- rnorm(length(samps_glmer_BC$beta[,num_sp]), mean=rnorm(length(samps_glmer_BC$beta[,num_sp]), mean=samps_glmer_BC$beta[,num_sp], sd=toadID_sigma), sd=samp_sigma)
 }
 
 
+# Now, we can calculate the probability that the "test" dataset values come from this distribution
+# List of individuals
+treat_indiv <- unique(mf_treat_without_init_infect$toadID)
 # Loop through and calculate probability of having diversity at that level
 pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_pinhib=rep(NA, length(treat_indiv)), p_pinhib=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
 for ( i in treat_indiv ) {
     n_row <- match(i, treat_indiv)
     sp <- unlist(strsplit(i,"_"))
     num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
-    temp_p <- mf_treat_without_init_infect %>%
+    temp_percInhib <- mf_treat_without_init_infect %>%
         filter(toadID==i, time <=5 ) %>%
         filter(!is.na(percInhib))%>%
         filter(!is.na(n))%>%
         dplyr::select(percInhib) %>%
         pull()
-    temp_size <- mf_treat_without_init_infect %>%
-        filter(toadID==i, time <=5 ) %>%
-        filter(!is.na(percInhib))%>%
-        filter(!is.na(n))%>%
-        dplyr::select(n) %>%
-        pull()
     
-        exp_pinhib <- glm(cbind(temp_p*temp_size, temp_size-temp_p*temp_size) ~ 1, family="binomial")$coefficients
-        p_pinhib <- sum(mu_exp_distr[,sp[1]]<exp_pinhib)/length(mu_exp_distr[,sp[1]])
-        
-        ### Did they get infected?
-        infect <- max(mf_treat_without_init_infect %>%
-                          filter(toadID==i) %>%
-                          dplyr::select(eBD_raw) %>%
-                          pull()
-        )
-        
-        pre_exp_indiv[n_row,c("exp_pinhib","p_pinhib","infect")] <- c(exp_pinhib, p_pinhib, infect)
-
+    if ( length(temp_percInhib) > 1) {
+        exp_mu <-  fitdistr(temp_percInhib, "normal")$estimate[1]
+        # exp_mu <-  fitdistr(temp_bc, "beta", start=list(shape1=0.1, shape2=0.1))$estimate[1]
+    } else if ( length(temp_percInhib) == 1) {
+        exp_mu <- temp_percInhib
+    } else {
+        exp_mu <- NA
+    }
+    
+    # dm is distance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
+    p_mu <- sum(exp_distr[,sp[1]]<exp_mu, na.rm=TRUE)/length(exp_distr[,sp[1]])
+    
+    ### Did they get infected?
+    infect <- max(mf_treat_without_init_infect %>%
+                      filter(toadID==i) %>%
+                      dplyr::select(eBD_raw) %>%
+                      pull()
+    )
+    
+    pre_exp_indiv[n_row,c("exp_pinhib","p_pinhib","infect")] <- c(exp_mu, p_mu, infect)
     
 }
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
     separate(toadID, into=c("species","indiv"), remove = FALSE)
 
-# Plot results 
-gg_percInhib_p <- ggplot(pre_exp_indiv, aes(x=p_pinhib, y=log(infect+1))) +
-    geom_smooth(aes(col=species),method=lm, se=FALSE) +
-    geom_point(aes(color=species), cex=4)+
-    geom_smooth(method=lm, se=FALSE, col="black")
-gg_percInhib_raw <- ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(infect+1)))+
-    geom_smooth(aes(col=species),method=lm, se=FALSE) +
-    geom_point(aes(color=species), cex=4)+
-    geom_smooth(method=lm, se=FALSE, col="black")
-grid.arrange(gg_percInhib_p, gg_percInhib_raw, nrow=1)
-
-mu_exp_distr %>%
-    gather(key=species, value=percInhib) %>%
-    ggplot(aes(x=species, y=percInhib)) +
+exp_distr %>%
+    gather(key="species",value="d") %>%
+    ggplot(aes(x=species, y=d)) +
     geom_violin() +
-    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
+    geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib), col="red", position=position_jitter(width=0.1, height=0)) +
+    geom_point(data=mf_con_without_init_infect, aes(x=species, y=percInhib), col="blue", position=position_jitter(width=0.1, height=0))
 
+# Plot results 
+gg_pinhib_p <- pre_exp_indiv %>%
+    filter(!is.na(p_pinhib)) %>%
+    ggplot(aes(x=p_pinhib, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4) 
+# Raw numbers
+gg_pinhib_raw <- pre_exp_indiv %>%
+    filter(!is.na(exp_pinhib)) %>%
+    ggplot(aes(x=exp_pinhib, y=log(infect+1))) +
+    geom_smooth(method=lm, se=FALSE) +
+    geom_smooth(aes(col=species), method=lm, se=FALSE)+
+    geom_point(aes(color=species), cex=4)
+grid.arrange(gg_pinhib_p, gg_pinhib_raw, nrow=1)
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_pinhib, p_pinhib) %>%
     full_join(all_p, by="toadID")
+#' 
+#' #### PERCENT INHIBITORY ####
+#' x.fit.percInhib <- round(seq(max(min(mf_con_without_init_infect$percInhib, na.rm=TRUE)-sd(mf_con_without_init_infect$percInhib, na.rm=TRUE),0)
+#'                        , max(mf_con_without_init_infect$percInhib, na.rm=TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm=TRUE), length.out = 100), digits = 2)
+#' percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "beta", start=list(shape1=1, shape2=6))
+#' # percInhib.fit <- fitdistr(mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "gamma", start=list(shape=1, rate=8))
+#' y.pred.percInhib <- dbeta(x.fit.percInhib, shape1=percInhib.fit$estimate[1], shape2=percInhib.fit$estimate[2])
+#' # y.pred.percInhib <- dgamma(x.fit.percInhib, shape=percInhib.fit$estimate[1], rate=percInhib.fit$estimate[2])
+#' 
+#' mf_con_without_init_infect %>%
+#'     filter(!is.na(percInhib)) %>%
+#'     ggplot(aes(y=..density.., x=percInhib)) + 
+#'     geom_histogram(bins=20) +
+#'     geom_line(data=data.frame(x=x.fit.percInhib, y=y.pred.percInhib), aes(x=x,y=y), col="red")
+#' mf_con_without_init_infect %>%
+#'     filter(!is.na(percInhib)) %>%
+#'     ggplot(aes(x=percInhib)) + 
+#'     geom_histogram(aes(color=species), bins=20,show.legend = FALSE) +
+#'     facet_grid(~species)
+#' # Check to see if turnover is changing with time significantly
+#' gg_perctime_con <- mf_con_without_init_infect %>%
+#'     filter(!is.na(percInhib)) %>%
+#'     ggplot(aes(x=time, y=percInhib)) + 
+#'     geom_line(aes(group=toadID)) +
+#'     geom_point(aes(col=PABD)) +
+#'     scale_color_manual(values=c("blue","red"))+
+#'     facet_grid(~species)
+#' gg_perctime_treat <- mf_treat_without_init_infect %>%
+#'     filter(!is.na(percInhib)) %>%
+#'     ggplot(aes(x=time, y=percInhib)) + 
+#'     geom_line(aes(group=toadID)) +
+#'     geom_point(aes(col=PABD)) +
+#'     geom_vline(aes(xintercept=5.5))+
+#'     scale_color_manual(values=c("blue","red"))+
+#'     facet_grid(~species)
+#' grid.arrange(gg_perctime_con, gg_perctime_treat, nrow=2)
+#' 
+#' # Does percent inhibitory change with species or time?
+#' # Type I ANOVA (to test for interaction) in control group?
+#' anova(glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n), test = "Chisq")
+#' # Type III ANOVA (to test for main effects, given interaction) in control group?
+#' Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_con_without_init_infect, weights=mf_con_without_init_infect$n, contrasts=list(species=contr.sum)), type=3)
+#' 
+#' # Does percent inhibitory change with species or time in treatment group?
+#' # Type I ANOVA (to test for interaction) in control group?
+#' anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n), test = "Chisq")
+#' # Type III ANOVA (to test for main effects, given interaction) in control group?
+#' Anova(glm(percInhib ~ species*time, family = binomial(), data=mf_treat_without_init_infect, weights=mf_treat_without_init_infect$n, contrasts = list(species=contr.sum)), type=3)
+#' 
+#' #' We see that beta diversity is fairly normal.
+#' #' Now, let's fit some models to this data. We should use a GLMM with binomial as the response variable
+#' #' to find out the average beta diversity turnover for each species and for each individual through time.
+#' #' \
+#' #' u ~ BETA(s1_i, s1_i)\
+#' #' s1_i = a_j\
+#' #' a_j ~ N(u_sp, sigma_sp)\
+#' #' s2_i = b_j\
+#' #' b_j ~ N(u_sp, sigma_sp)\ 
+#' #' where i = sample, j = individual, sp = species
+#' #' Below, we use the dataset with JUST the controls.
+#' 
+#' inhibBin <- cbind(inhibCount=mf_con_without_init_infect$inhibCounts, noninhibCount=mf_con_without_init_infect$n)
+#' 
+#' if ( FALSE) {
+#'     glmer_percInhib <- stan_glmer(inhibBin ~ -1 + species + (1|toadID)
+#'                            , data=mf_con_without_init_infect
+#'                            , family = 'binomial'
+#'                            , seed= 9837423)
+#'     save(glmer_percInhib, file="glmer_percInhib.RData")
+#' } else {
+#'     load("glmer_percInhib.RData")
+#' }
+#' prior_summary(glmer_percInhib)
+#' 
+#' # Look at distributions according to models
+#' samps_glmer_percInhib<- rstan::extract(glmer_percInhib$stanfit)
+#' pre_test_set <- mf_treat_without_init_infect %>%
+#'     filter(time<=5) 
+#' samps_glmer_percInhib$beta %>%
+#'     as.data.frame() %>%
+#'     rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+#'     mutate(Anbo=inv_logit(Anbo)
+#'            ,Anma=inv_logit(Anma)
+#'            ,Osse=inv_logit(Osse)
+#'            ,Lica=inv_logit(Lica)
+#'            ,Lipi=inv_logit(Lipi)) %>%
+#'     dplyr::select(Anbo,Anma,Lica,Lipi, Osse) %>%
+#'     gather(key=species, value=percInhib) %>%
+#'     ggplot(mapping=aes(x=species, y=percInhib))+
+#'     geom_violin() +
+#'     geom_point(data=mf_con_without_init_infect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+#'     geom_point(data=pre_test_set, aes(y=percInhib, x=species), position=position_jitter(width = 0.1, height=0), col="red")
+#' # legend("topright", legend=c("Control (all)","Treatment (Pre)"), pch=21, col=c("blue","red"))
+#' 
+#' 
+#' 
+#' # indiv_mu <- ranef(glmer_percInhib)$toadID
+#' # sp_mu <- fixef(glmer_BC)
+#' toadID_sigma <- sd(samps_glmer_percInhib$b[,ncol(samps_glmer_percInhib$b)])
+#' 
+#' # instead of predicted distr, we get predicted mu 
+#' # List of each species
+#' species_list <- levels(factor(mf_con_without_init_infect$species))
+#' # Get predicted distribuion
+#' mu_exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+#' for ( num_sp in 1:length(species_list)) {
+#'     # mu_exp_distr[,num_sp] <- rbinom(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
+#'     mu_exp_distr[,num_sp] <- rnorm(4000, mean=samps_glmer_percInhib$beta[,num_sp], sd=toadID_sigma)
+#' }
+#' 
+#' 
+#' # Loop through and calculate probability of having diversity at that level
+#' pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_pinhib=rep(NA, length(treat_indiv)), p_pinhib=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
+#' for ( i in treat_indiv ) {
+#'     n_row <- match(i, treat_indiv)
+#'     sp <- unlist(strsplit(i,"_"))
+#'     num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
+#'     temp_p <- mf_treat_without_init_infect %>%
+#'         filter(toadID==i, time <=5 ) %>%
+#'         filter(!is.na(percInhib))%>%
+#'         filter(!is.na(n))%>%
+#'         dplyr::select(percInhib) %>%
+#'         pull()
+#'     temp_size <- mf_treat_without_init_infect %>%
+#'         filter(toadID==i, time <=5 ) %>%
+#'         filter(!is.na(percInhib))%>%
+#'         filter(!is.na(n))%>%
+#'         dplyr::select(n) %>%
+#'         pull()
+#'     
+#'         exp_pinhib <- glm(cbind(temp_p*temp_size, temp_size-temp_p*temp_size) ~ 1, family="binomial")$coefficients
+#'         p_pinhib <- sum(mu_exp_distr[,sp[1]]<exp_pinhib)/length(mu_exp_distr[,sp[1]])
+#'         
+#'         ### Did they get infected?
+#'         infect <- max(mf_treat_without_init_infect %>%
+#'                           filter(toadID==i) %>%
+#'                           dplyr::select(eBD_raw) %>%
+#'                           pull()
+#'         )
+#'         
+#'         pre_exp_indiv[n_row,c("exp_pinhib","p_pinhib","infect")] <- c(exp_pinhib, p_pinhib, infect)
+#' 
+#'     
+#' }
+#' # create species column
+#' pre_exp_indiv <- pre_exp_indiv %>%
+#'     separate(toadID, into=c("species","indiv"), remove = FALSE)
+#' 
+#' # Plot results 
+#' gg_percInhib_p <- ggplot(pre_exp_indiv, aes(x=p_pinhib, y=log(infect+1))) +
+#'     geom_smooth(aes(col=species),method=lm, se=FALSE) +
+#'     geom_point(aes(color=species), cex=4)+
+#'     geom_smooth(method=lm, se=FALSE, col="black")
+#' gg_percInhib_raw <- ggplot(pre_exp_indiv, aes(x=inv_logit(exp_pinhib), y=log(infect+1)))+
+#'     geom_smooth(aes(col=species),method=lm, se=FALSE) +
+#'     geom_point(aes(color=species), cex=4)+
+#'     geom_smooth(method=lm, se=FALSE, col="black")
+#' grid.arrange(gg_percInhib_p, gg_percInhib_raw, nrow=1)
+#' 
+#' mu_exp_distr %>%
+#'     gather(key=species, value=percInhib) %>%
+#'     ggplot(aes(x=species, y=percInhib)) +
+#'     geom_violin() +
+#'     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_pinhib, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
+#' 
+#' all_p <- pre_exp_indiv %>%
+#'     dplyr::select(toadID, exp_pinhib, p_pinhib) %>%
+#'     full_join(all_p, by="toadID")
 
 #### INHIB RICHNESS ####
 

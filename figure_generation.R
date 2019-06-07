@@ -5,6 +5,7 @@ library(ggplot2)
 library(gridExtra)
 library(car) #Anova
 library(RColorBrewer) # colors for barplots
+library(MASS) #fitdistr
 
 # Make directory for figures
 dir.create("FIGURES")
@@ -488,4 +489,91 @@ all_p %>%
     ylab("OTU Richness (Percentile of species)") + 
     xlab("Inhibitory OTU Richness (Percentile of species)")
 dev.off()
- 
+
+
+##### SUPPLEMENTARY FIGURES ######
+
+#### Fit models for each trait ####
+
+## Logrich
+
+logrich.normfit <- fitdistr(x=mf_con_without_init_infect$logRich, densfun = "normal")
+x.pred <- seq(min(mf_con_without_init_infect$logRich)-sd(mf_con_without_init_infect$logRich)
+              , max(mf_con_without_init_infect$logRich)+sd(mf_con_without_init_infect$logRich)
+              , length.out = 100)
+y.expect <- dnorm(x=x.pred, mean=logrich.normfit$estimate[1], sd=logrich.normfit$estimate[2])
+
+gg_logrich_fit <- mf_con_without_init_infect %>%
+    ggplot(aes(x=logRich, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect), aes(x=x, y=y), col="red")
+
+
+## Dispersion
+
+disp.normfit <- fitdistr(x=mf_con_without_init_infect$distance.to.centroid, densfun = "normal")
+disp.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance.to.centroid, densfun = "lognormal")
+x.pred <- seq(min(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)-sd(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)
+              , max(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)+sd(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)
+              , length.out = 100)
+y.expect.norm <- dnorm(x=x.pred, mean=disp.normfit$estimate[1], sd=disp.normfit$estimate[2])
+y.expect.lognorm <- dlnorm(x=x.pred, meanlog=disp.lognormfit$estimate[1], sdlog = disp.lognormfit$estimate[2])
+
+gg_disp_fit <- mf_con_without_init_infect %>%
+    ggplot(aes(x=distance.to.centroid, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.lognorm), aes(x=x, y=y), col="blue") 
+
+
+## Instability
+
+instab.normfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "normal")
+instab.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "beta", start = list(shape1=1,shape2=1))
+x.pred <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
+              , max(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)+sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
+              , length.out = 100)
+y.expect.norm <- dnorm(x=x.pred, mean=instab.normfit$estimate[1], sd=instab.normfit$estimate[2])
+y.expect.beta <- dbeta(x=x.pred, shape1 = instab.lognormfit$estimate[1], shape2 = instab.lognormfit$estimate[2])
+
+mf_con_without_init_infect %>%
+    ggplot(aes(x=distance_bray_curtis, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="blue") 
+
+
+## Instability
+
+instab.normfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "normal")
+instab.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "beta", start = list(shape1=1,shape2=1))
+x.pred <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
+              , max(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)+sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
+              , length.out = 100)
+y.expect.norm <- dnorm(x=x.pred, mean=instab.normfit$estimate[1], sd=instab.normfit$estimate[2])
+y.expect.beta <- dbeta(x=x.pred, shape1 = instab.lognormfit$estimate[1], shape2 = instab.lognormfit$estimate[2])
+
+gg_instab_fit <- mf_con_without_init_infect %>%
+    ggplot(aes(x=distance_bray_curtis, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="blue") 
+
+## InhibRich
+
+?fitdistr
+inhibRich.normfit <- fitdistr(x=mf_con_without_init_infect$inhibRich[!is.na(mf_con_without_init_infect$inhibRich)], densfun = "normal")
+inhibRich.posfit <- fitdistr(x=mf_con_without_init_infect$inhibRich[!is.na(mf_con_without_init_infect$inhibRich)], densfun = "Poisson")
+x.pred <- round(seq(min(mf_con_without_init_infect$inhibRich, na.rm = TRUE)-sd(mf_con_without_init_infect$inhibRich, na.rm = TRUE)
+              , max(mf_con_without_init_infect$inhibRich, na.rm = TRUE)+sd(mf_con_without_init_infect$inhibRich, na.rm = TRUE)
+              , length.out = 100))
+y.expect.norm <- dnorm(x=x.pred, mean=inhibRich.normfit$estimate[1], sd=inhibRich.normfit$estimate[2])
+y.expect.pois <- dpois(x=x.pred, lambda = inhibRich.posfit$estimate[1])
+
+gg_inhibRich_fit <- mf_con_without_init_infect %>%
+    ggplot(aes(x=inhibRich, y=..density..)) +
+    geom_histogram(bins=25) +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
+    geom_line(data=data.frame(x=x.pred, y=y.expect.pois), aes(x=x, y=y), col="purple") 
+
+
