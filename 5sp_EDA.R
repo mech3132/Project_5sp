@@ -389,7 +389,7 @@ for ( name in names(dm_all) ) {
 #' an individual relative to all other individuals. That is, how much different is an individual from the centroid 
 #' of all samples at that time point of that species?
 #' 
-# Now, filter mf to rarefied OTU table
+# Now, filter mf to rarefied OTU tables
 mf.rare <- mf.raw %>%
     filter(SampleID %in% colnames(otu_rare))
 
@@ -548,7 +548,6 @@ save(dm.filt.con, file="dm.filt.con.RData")
 adonis2(dm.filt.con ~ species:time, data=mf_con_without_init_infect, by="margin")
 adonis2(dm.filt.con ~ species + time + species:time, data=mf_con_without_init_infect, by="margin")
 
-
 #' There is a significant effect of species AND time AND interaction on COMPOSITION
 
 rbind(mf_con_without_init_infect, mf_treat_without_init_infect) %>%
@@ -592,10 +591,22 @@ x.fit.obsotu <- seq(min(mf_con_without_init_infect$logRich)-sd(mf_con_without_in
                      , length.out = 100)
 y.pred.obsotu <- dnorm(x.fit.obsotu, mean = (obsotu_lognormal_param$estimate[1]), sd = (obsotu_lognormal_param$estimate[2]))
 
+### new: lognormal ###
+obsotu_lognormal_param <- fitdistr(mf_con_without_init_infect$observed_otus, densfun="log-normal")
+obsotu_normal_param <- fitdistr(mf_con_without_init_infect$observed_otus, densfun="Normal")
+x.fit.obsotu <- seq(min(mf_con_without_init_infect$observed_otus)-sd(mf_con_without_init_infect$observed_otus)
+                    , max(mf_con_without_init_infect$observed_otus)+sd(mf_con_without_init_infect$observed_otus)
+                    , length.out = 100)
+y.pred.obsotu <- dlnorm(x.fit.obsotu, meanlog = (obsotu_lognormal_param$estimate[1]), sdlog = (obsotu_lognormal_param$estimate[2]))
+
+ 
+
+###
+
 gg_shannon_all <- ggplot(data=mf_con_without_init_infect, aes(x=shannon)) +
     geom_histogram(aes(y=..density..), bins=20) +
     geom_line(data=data.frame(x=x.fit.shannon, y=y.pred.shannon), aes(x=x, y=y), col="red")
-gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=logRich)) +
+gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=observed_otus)) +
     geom_histogram(aes(y=..density..), bins=20) +
     geom_line(data=data.frame(x=x.fit.obsotu, y=y.pred.obsotu), aes(x=x, y=y), col="red")
 grid.arrange(gg_shannon_all, gg_obsotu_all, nrow=1)
@@ -633,15 +644,15 @@ Anova(lm(shannon ~ species * time, data=mf_treat_without_init_infect, contrasts=
 
 
 gg_richtime_con <- mf_con_without_init_infect %>%
-    filter(!is.na(logRich)) %>%
-    ggplot(aes(x=time, y=logRich)) + 
+    filter(!is.na(observed_otus)) %>%
+    ggplot(aes(x=time, y=log(observed_otus))) + 
     geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
     scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_richtime_treat <- mf_treat_without_init_infect %>%
-    filter(!is.na(logRich)) %>%
-    ggplot(aes(x=time, y=logRich)) + 
+    filter(!is.na(observed_otus)) %>%
+    ggplot(aes(x=time, y=log(observed_otus))) + 
     geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
     geom_vline(aes(xintercept=5.5)) +

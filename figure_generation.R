@@ -529,35 +529,18 @@ gg_disp_fit <- mf_con_without_init_infect %>%
 ## Instability
 
 instab.normfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "normal")
-instab.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "beta", start = list(shape1=1,shape2=1))
+instab.beta <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "beta", start = list(shape1=6,shape2=6))
 x.pred <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
               , max(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)+sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
               , length.out = 100)
 y.expect.norm <- dnorm(x=x.pred, mean=instab.normfit$estimate[1], sd=instab.normfit$estimate[2])
-y.expect.beta <- dbeta(x=x.pred, shape1 = instab.lognormfit$estimate[1], shape2 = instab.lognormfit$estimate[2])
-
-mf_con_without_init_infect %>%
-    ggplot(aes(x=distance_bray_curtis, y=..density..)) +
-    geom_histogram(bins=25) +
-    geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
-    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="blue") 
-
-
-## Instability
-
-instab.normfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "normal")
-instab.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance_bray_curtis[!is.na(mf_con_without_init_infect$distance_bray_curtis)], densfun = "beta", start = list(shape1=1,shape2=1))
-x.pred <- seq(min(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
-              , max(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)+sd(mf_con_without_init_infect$distance_bray_curtis, na.rm = TRUE)
-              , length.out = 100)
-y.expect.norm <- dnorm(x=x.pred, mean=instab.normfit$estimate[1], sd=instab.normfit$estimate[2])
-y.expect.beta <- dbeta(x=x.pred, shape1 = instab.lognormfit$estimate[1], shape2 = instab.lognormfit$estimate[2])
+y.expect.beta <- dbeta(x=x.pred, shape1 = instab.beta$estimate[1], shape2 = instab.beta$estimate[2])
 
 gg_instab_fit <- mf_con_without_init_infect %>%
     ggplot(aes(x=distance_bray_curtis, y=..density..)) +
     geom_histogram(bins=25) +
     geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
-    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="blue") 
+    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="darkgreen") 
 
 ## InhibRich
 
@@ -578,23 +561,20 @@ gg_inhibRich_fit <- mf_con_without_init_infect %>%
 ## percInhib
 
 percInhib.normfit <- fitdistr(x=mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "normal")
-percInhib.binfit <- sum(mf_con_without_init_infect$inhibCounts, na.rm=TRUE)/sum(mf_con_without_init_infect$n, na.rm=TRUE)
-
-x.pred <- seq(0
-                    , min(max(mf_con_without_init_infect$percInhib, na.rm = TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm = TRUE),1)
+percInhib.beta <- fitdistr(x=mf_con_without_init_infect$percInhib[!is.na(mf_con_without_init_infect$percInhib)], densfun = "beta", start = list(shape1=1,shape2=6))
+x.pred <- seq(0, min(max(mf_con_without_init_infect$percInhib, na.rm = TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm = TRUE),1)
                     , length.out = 100)
-x.pred.bin <- seq(0
-              , min(max(mf_con_without_init_infect$percInhib, na.rm = TRUE)+sd(mf_con_without_init_infect$percInhib, na.rm = TRUE),1)*100
-              , by=1)
 y.expect.norm <- dnorm(x=x.pred, mean=percInhib.normfit$estimate[1], sd=percInhib.normfit$estimate[2])
-y.expect.bin <- dbinom(x=x.pred.bin*100, size=100, prob = percInhib.binfit)
+y.expect.beta <- dbeta(x=x.pred, shape1=percInhib.beta$estimate[1], shape2=percInhib.beta$estimate[2])
 
 
-random.bin <- rbinom(n=length(mf_con_without_init_infect$n)*100, size=rep(mf_con_without_init_infect$n, 100), prob=percInhib.binfit)/rep(mf_con_without_init_infect$n, 100)
-
-# gg_percInhib_fit <- 
-    mf_con_without_init_infect %>%
+gg_percInhib_fit <- mf_con_without_init_infect %>%
     ggplot(aes(x=percInhib, y=..density..)) +
     geom_histogram(bins=25) +
     geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
-    geom_density(data=data.frame(hist=random.bin), aes(x=hist, y=..density..), col="blue", ) 
+    geom_line(data=data.frame(x=x.pred, y=y.expect.beta), aes(x=x, y=y), col="darkgreen") 
+    
+
+pdf("FIGURES/comparison_fits.pdf", width=6, height=4)
+grid.arrange(gg_logrich_fit, gg_disp_fit, gg_instab_fit, gg_inhibRich_fit, gg_percInhib_fit, nrow=2)
+dev.off()

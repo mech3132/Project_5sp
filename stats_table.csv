@@ -1,0 +1,13 @@
+Microbiome metric,Control or Treatment,Main effect: species,Main effect: time,Interaction: species x time
+Beta Diversity,Control,"p=0.001, F(4,197)=79","p=0.001, F(1,197)=29","p=0.001, F(4,197)=7.7"
+Beta Diversity,Treatment,"p=0.001, F(4,180)=44","p=0.001, F(1,180)=12.4","p=0.001, F(4,180)=3.6"
+OTU Richness,Control,"p=2.72e-12, F(4,201)=17","p=0.241, F(1,201)=1.38(+)","p=0.229, F(4,197)=1.4"
+OTU RIchness,Treatment,"p=0.00542, F(4,274)=3.8","p=0.725, F(1,274)=0.124(+)","p=0.000485, F(4,274)=5.2"
+Distance to centroid,Control,"p=3.04e-06, F(4,201)=8.3","p=3.9e-08, F(1,201)=32.7(+)","p=0.104, F(4,197)=1.9"
+Distance to centroid,Treatment,"p=5.34e-07, F(4,278)=9.2","p=1.65e-06, F(1,278)=24(+)","p=0.00871, F(4,274)=3.5"
+Stability (BC distance),Control,"p=2.57e-05, Chisq(4,N=278)=26","p=0.644, Chisq(1,N=278)=0.214(-)","p=0.513, Chisq(4,N=274)=3.3"
+Stability (BC distance),Treatment,"p=6.77e-05, Chisq(4,N=278)=24","p=0.0703, Chisq(1,N=278)=3.28(-)","p=0.788, Chisq(4,N=274)=1.7"
+Percent Inhibitory,Control,"p=4.82e-06, Chisq(4,N=278)=30","p=0.525, Chisq(1,N=278)=0.405(+)","p=6.04e-08, Chisq(4,N=274)=39"
+Percent Inhibitory,Treatment,"p=1.73e-11, Chisq(4,N=278)=56","p=8.37e-05, Chisq(1,N=278)=15.5(+)","p=0.0187, Chisq(4,N=274)=12"
+Inhibitory Richness,Control,"p=1.32e-08, Chisq(4)=42","p=0.394, Chisq(1)=0.726(-)","p=2.59e-06, LRChi(4,N=206)=31"
+Inhibitory Richness,Treatment,"p=8.39e-05, Chisq(4)=24","p=0.371, Chisq(1)=0.799(-)","p=0.00109, LRChi(4,N=283)=18"

@@ -1,7 +1,7 @@
 Exploratory Data Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Thu Jun 6 18:38:37 2019
+Thu Jun 6 20:51:51 2019
 
 First, load required packages
 -----------------------------
@@ -863,10 +863,22 @@ x.fit.obsotu <- seq(min(mf_con_without_init_infect$logRich)-sd(mf_con_without_in
                      , length.out = 100)
 y.pred.obsotu <- dnorm(x.fit.obsotu, mean = (obsotu_lognormal_param$estimate[1]), sd = (obsotu_lognormal_param$estimate[2]))
 
+### new: lognormal ###
+obsotu_lognormal_param <- fitdistr(mf_con_without_init_infect$observed_otus, densfun="log-normal")
+obsotu_normal_param <- fitdistr(mf_con_without_init_infect$observed_otus, densfun="Normal")
+x.fit.obsotu <- seq(min(mf_con_without_init_infect$observed_otus)-sd(mf_con_without_init_infect$observed_otus)
+                    , max(mf_con_without_init_infect$observed_otus)+sd(mf_con_without_init_infect$observed_otus)
+                    , length.out = 100)
+y.pred.obsotu <- dlnorm(x.fit.obsotu, meanlog = (obsotu_lognormal_param$estimate[1]), sdlog = (obsotu_lognormal_param$estimate[2]))
+
+ 
+
+###
+
 gg_shannon_all <- ggplot(data=mf_con_without_init_infect, aes(x=shannon)) +
     geom_histogram(aes(y=..density..), bins=20) +
     geom_line(data=data.frame(x=x.fit.shannon, y=y.pred.shannon), aes(x=x, y=y), col="red")
-gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=logRich)) +
+gg_obsotu_all <- ggplot(data=mf_con_without_init_infect, aes(x=observed_otus)) +
     geom_histogram(aes(y=..density..), bins=20) +
     geom_line(data=data.frame(x=x.fit.obsotu, y=y.pred.obsotu), aes(x=x, y=y), col="red")
 grid.arrange(gg_shannon_all, gg_obsotu_all, nrow=1)
@@ -970,15 +982,15 @@ Anova(lm(shannon ~ species * time, data=mf_treat_without_init_infect, contrasts=
 
 ``` r
 gg_richtime_con <- mf_con_without_init_infect %>%
-    filter(!is.na(logRich)) %>%
-    ggplot(aes(x=time, y=logRich)) + 
+    filter(!is.na(observed_otus)) %>%
+    ggplot(aes(x=time, y=log(observed_otus))) + 
     geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
     scale_color_manual(values=c("blue","red"))+
     facet_grid(~species)
 gg_richtime_treat <- mf_treat_without_init_infect %>%
-    filter(!is.na(logRich)) %>%
-    ggplot(aes(x=time, y=logRich)) + 
+    filter(!is.na(observed_otus)) %>%
+    ggplot(aes(x=time, y=log(observed_otus))) + 
     geom_line(aes(group=toadID)) +
     geom_point(aes(group=toadID, col=PABD)) +
     geom_vline(aes(xintercept=5.5)) +
