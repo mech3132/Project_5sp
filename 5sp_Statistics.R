@@ -28,6 +28,11 @@ load("dm.filt.treat.RData")
 # Previous analyses summaries
 load("all_p.RData")
 load("all_p_infected.RData")
+load("all_p_withcon.RData")
+
+# Inhibitory OTUs
+load("mf_con_with_inhibOTUs.RData")
+load("mf_treat_with_inhibOTUs.RData")
 
 # add a species column and PABD column
 all_p <- all_p %>%
@@ -54,29 +59,40 @@ gg_infect <- mf_treat_without_init_infect  %>%
 
 temp1 <- mf_con_without_init_infect %>%
     dplyr::select(species, logRich) %>%
-    mutate(metric="logRich") %>%
+    mutate(metric="log_OTU_Richness") %>%
     rename(value=logRich)
 temp2 <- mf_con_without_init_infect %>%
     dplyr::select(species, inhibRich) %>%
-    mutate(metric="inhibRich")%>%
+    mutate(metric="Inhibitory_OTU_Richness")%>%
     rename(value=inhibRich)
 temp3 <- mf_con_without_init_infect %>%
     dplyr::select(species, percInhib) %>%
-    mutate(metric="percInhib")%>%
+    mutate(metric="Percent_Inhibitory")%>%
     rename(value=percInhib)
 temp4 <- mf_con_without_init_infect %>%
+    dplyr::select(species, disper_bray_curtis) %>%
+    mutate(metric="Dispersion_from_centroid")%>%
+    rename(value=disper_bray_curtis)
+temp5 <- mf_con_without_init_infect %>%
     dplyr::select(species, distance_bray_curtis) %>%
-    mutate(metric="distance_bray_curtis")%>%
+    mutate(metric="Distance_from_previous_timepoint")%>%
     rename(value=distance_bray_curtis)
 
-gg_all <- rbind(temp1,temp2,temp3,temp4) %>%
-    ggplot(aes(x=species, y=value)) +
+
+gg_all <- rbind(temp1,temp2,temp3,temp4, temp5) %>%
+    rename(Species=species) %>%
+    mutate(Metric = gsub("_"," ",metric, fixed=TRUE)) %>%
+    mutate(Metric = factor(Metric, levels=c("log OTU Richness","Dispersion from centroid", "Distance from previous timepoint","Inhibitory OTU Richness","Percent Inhibitory"))) %>%
+    ggplot(aes(x=Species, y=value)) +
     geom_boxplot() +
-    geom_point(aes(col=species), position = position_jitter(width=0.1, height=0))+
-    facet_grid(metric~., scales = "free") 
+    geom_point(aes(col=Species), position = position_jitter(width=0.1, height=0), alpha=1/3)+
+    facet_grid(Metric~., scales = "free", switch="y") +
+    ylab("")+
+    xlab("Species") 
 lay <- rbind(c(1,2),
              c(3,2))
-#+ fig.height=10, fig.width=10
+
+#+ fig.height=12, fig.width=10
 grid.arrange(gg_NMDS, gg_all, gg_infect, layout_matrix = lay)
 
 #### Stats ####
@@ -145,21 +161,21 @@ rich_treat_main
 ### DISTANCE TO CENTROID AND TIME ####
 #' Is there an effect of species and time on controls?
 # Type I ANOVA (to check for interaction) (AB | A,B)
-centroid_con_interaction_lm <- lm(log(distance.to.centroid) ~ species*time, data=mf_con_without_init_infect)
+centroid_con_interaction_lm <- lm(log(disper_bray_curtis) ~ species*time, data=mf_con_without_init_infect)
 centroid_con_interaction <- anova(centroid_con_interaction_lm)
 centroid_con_interaction
 # Type II ANOVA with no interaction
-centroid_con_main_lm <- lm(log(distance.to.centroid) ~ species + time, data=mf_con_without_init_infect)
+centroid_con_main_lm <- lm(log(disper_bray_curtis) ~ species + time, data=mf_con_without_init_infect)
 centroid_con_main <- Anova(centroid_con_main_lm, type = 2)
 centroid_con_main
 
 #' Is there an effect of species and time on treatment??
 # Type I ANOVA (to check for interaction) (AB | A,B)
-centroid_treat_interaction_lm <- lm(log(distance.to.centroid) ~ species*time, data=mf_treat_without_init_infect)
+centroid_treat_interaction_lm <- lm(log(disper_bray_curtis) ~ species*time, data=mf_treat_without_init_infect)
 centroid_treat_interaction <- anova(centroid_treat_interaction_lm)
 centroid_treat_interaction
 # Type II ANOVA with no interaction
-centroid_treat_main_lm <- lm(log(distance.to.centroid) ~ species + time, data=mf_treat_without_init_infect)
+centroid_treat_main_lm <- lm(log(disper_bray_curtis) ~ species + time, data=mf_treat_without_init_infect)
 centroid_treat_main <- Anova(centroid_treat_main_lm, type = 2)
 centroid_treat_main
 
@@ -519,11 +535,11 @@ write_csv(stat_results, path = "stats_table.csv")
 #' linearized model to see if there is a relationship between diversity and infection rate.
 #' \
 
-glm_PABD_prich <- glm(PABD ~ species*p_rich, data=all_p, family=binomial(link="logit"))
+glm_PABD_prich <- glm(PABD ~ species*p_logRich, data=all_p, family=binomial(link="logit"))
 anova(glm_PABD_prich, test="Chisq") # test for interaction
 Anova(glm_PABD_prich, type=2) # test for main effects
 all_p %>%
-    ggplot(aes(x=p_rich, y=PABD)) +
+    ggplot(aes(x=p_logRich, y=PABD)) +
     geom_point(aes(col=species), cex=3)  
 
 #' If anything, it looks like increased diversity and richness might increase infection risk
@@ -539,19 +555,19 @@ all_p %>%
 #' \
 
 #' Now let's do richness
-lm_eBD_prich <- lm(eBD_log ~ species*p_rich, data=all_p)
+lm_eBD_prich <- lm(eBD_log ~ species*p_logRich, data=all_p)
 anova(lm_eBD_prich)
 Anova(lm_eBD_prich, type=2)
 all_p %>%
-    ggplot(aes(x=p_rich, y=eBD_log)) +
+    ggplot(aes(x=p_logRich, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
 #' Try a version where we remove zeros so that we do not have zero-inflated data
-lm_eBD_prich_nozeros <- lm(eBD_log_infected ~ species*p_rich, data=all_p)
+lm_eBD_prich_nozeros <- lm(eBD_log_infected ~ species*p_logRich, data=all_p)
 anova(lm_eBD_prich_nozeros)
 Anova(lm_eBD_prich_nozeros, type=2)
 all_p %>%
-    ggplot(aes(x=p_rich, y=eBD_log_infected)) +
+    ggplot(aes(x=p_logRich, y=eBD_log_infected)) +
     geom_point(aes(col=species), cex=3) 
 
 #### PABD and Instability  ####
@@ -560,11 +576,11 @@ all_p %>%
 #' Here we look at average distance travelled (bray-curtis) between samples
 #' prior to being infected. We see if it is correlated to infection risk.\
 
-glm_PABD_pbc <- glm(PABD ~ species*p_mu, data=all_p, family=binomial)
+glm_PABD_pbc <- glm(PABD ~ species*p_dist, data=all_p, family=binomial)
 anova(glm_PABD_pbc, test="Chisq")
 Anova(glm_PABD_pbc, type=2)
 all_p %>%
-    ggplot(aes(x=p_mu, y=PABD)) +
+    ggplot(aes(x=p_dist, y=PABD)) +
     geom_point(aes(col=species), cex=3) 
 
 
@@ -573,19 +589,19 @@ all_p %>%
 #' \
 #' (2b) Does instability of microbiome influence BD infection intensity?\
 
-lm_BD_pbc <- lm(eBD_log ~ species*p_mu, data=all_p)
+lm_BD_pbc <- lm(eBD_log ~ species*p_dist, data=all_p)
 anova(lm_BD_pbc)
 Anova(lm_BD_pbc, type=2)
 all_p %>%
-    ggplot(aes(x=p_mu, y=eBD_log)) +
+    ggplot(aes(x=p_dist, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
 #' What if we remove those not infected?
-lm_BD_pbc_nozeros <- lm(eBD_log_infected ~ species*p_mu, data=all_p)
+lm_BD_pbc_nozeros <- lm(eBD_log_infected ~ species*p_dist, data=all_p)
 anova(lm_BD_pbc_nozeros)
 Anova(lm_BD_pbc_nozeros, type=2)
 all_p %>%
-    ggplot(aes(x=p_mu, y=eBD_log_infected)) +
+    ggplot(aes(x=p_dist, y=eBD_log_infected)) +
     geom_point(aes(col=species), cex=3) 
 
 #### PABD and Dispersion ####
@@ -594,11 +610,11 @@ all_p %>%
 #' Here we look at average distance to centroid (bray-curtis) between samples
 #' prior to being infected at same time point. We see if it is correlated to infection risk.
 
-glm_PABD_pdist <- glm(PABD ~ species*p_distmu, data=all_p, family=binomial)
+glm_PABD_pdist <- glm(PABD ~ species*p_disper, data=all_p, family=binomial)
 anova(glm_PABD_pdist, test="Chisq")
 Anova(glm_PABD_pdist, type=2)
 all_p %>%
-    ggplot(aes(x=p_distmu, y=PABD)) +
+    ggplot(aes(x=p_disper, y=PABD)) +
     geom_point(aes(col=species), cex=3) 
 
 
@@ -608,19 +624,19 @@ all_p %>%
 #' \
 #' (2b) Does dispersion of microbiome influence BD infection intensity?\
 
-lm_BD_pdist <- lm(eBD_log ~ species*p_distmu, data=all_p)
+lm_BD_pdist <- lm(eBD_log ~ species*p_disper, data=all_p)
 anova(lm_BD_pdist)
 Anova(lm_BD_pdist, type=2) ## SIG
 all_p %>%
-    ggplot(aes(x=p_distmu, y=eBD_log)) +
+    ggplot(aes(x=p_disper, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
 #' Let's try removing zeros
-lm_BD_pdist_nozeros <- lm(eBD_log_infected ~ species*p_distmu, data=all_p)
+lm_BD_pdist_nozeros <- lm(eBD_log_infected ~ species*p_disper, data=all_p)
 anova(lm_BD_pdist_nozeros)
-Anova(lm_BD_pdist_nozeros, type=2) ## SIG
+Anova(lm_BD_pdist_nozeros, type=2)
 all_p %>%
-    ggplot(aes(x=p_distmu, y=eBD_log_infected)) +
+    ggplot(aes(x=p_disper, y=eBD_log_infected)) +
     geom_point(aes(col=species), cex=3) 
 
 #### PABD and Inhibitory ####
@@ -641,11 +657,11 @@ all_p %>%
     geom_point(aes(col=species), cex=3)
 
 #' Now let's do percent inhibitory of standardized values
-glm_PABD_ppinhib <- glm(PABD ~ species*p_pinhib, data=all_p, family=binomial)
+glm_PABD_ppinhib <- glm(PABD ~ species*p_percInhib, data=all_p, family=binomial)
 anova(glm_PABD_ppinhib, test="Chisq")
 Anova(glm_PABD_ppinhib, type=2)
 all_p %>%
-    ggplot(aes(x=p_pinhib, y=PABD)) +
+    ggplot(aes(x=p_percInhib, y=PABD)) +
     geom_point(aes(col=species), cex=3)
 
 #### eBD and Inhibitory ####
@@ -669,19 +685,19 @@ all_p %>%
     geom_point(aes(col=species), cex=3)
 
 #' Now let's do percent inhibitory of standardized values
-lm_eBD_ppinhib <- lm(eBD_log ~  species*p_pinhib, data=all_p)
+lm_eBD_ppinhib <- lm(eBD_log ~  species*p_percInhib, data=all_p)
 anova(lm_eBD_ppinhib)
 Anova(lm_eBD_ppinhib, type=2)
 all_p %>%
-    ggplot(aes(x=p_pinhib, y=eBD_log)) +
+    ggplot(aes(x=p_percInhib, y=eBD_log)) +
     geom_point(aes(col=species), cex=3) 
 
 # Remove non-infected individuals and re-run
-lm_eBD_ppinhib_nozeros <- lm(eBD_log_infected ~  species*p_pinhib, data=all_p)
+lm_eBD_ppinhib_nozeros <- lm(eBD_log_infected ~  species*p_percInhib, data=all_p)
 anova(lm_eBD_ppinhib_nozeros)
 Anova(lm_eBD_ppinhib_nozeros, type=2)
 all_p %>%
-    ggplot(aes(x=p_pinhib, y=eBD_log_infected)) +
+    ggplot(aes(x=p_percInhib, y=eBD_log_infected)) +
     geom_point(aes(col=species), cex=3) 
 
 ####Part II: Affect of BD infection on microbiome state####
@@ -725,12 +741,12 @@ all_p_infected %>%
 
 #' (2a) Does BD infection state affect microbiome instability?
 
-lm_pbc_PABD <- lm(p_BC ~ species*PABD, data=all_p_infected)
-anova(lm_pbc_PABD)
-Anova(lm_pbc_PABD)
+lm_pdist_PABD <- lm(p_dist ~ species*PABD, data=all_p_infected)
+anova(lm_pdist_PABD)
+Anova(lm_pdist_PABD)
 all_p_infected %>%
     mutate(PABD = factor(PABD)) %>%
-    ggplot(aes(x=PABD, y=p_BC)) +
+    ggplot(aes(x=PABD, y=p_dist)) +
     geom_boxplot() +
     geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
@@ -740,19 +756,19 @@ all_p_infected %>%
 #' (2b) Does BD infection intensity affect microbiome instability?
 #' 
 
-lm_pbc_eBD <- lm(p_BC ~ species*eBD_log, data=all_p_infected)
-anova(lm_pbc_eBD)
-Anova(lm_pbc_eBD)
+lm_pdist_eBD <- lm(p_dist ~ species*eBD_log, data=all_p_infected)
+anova(lm_pdist_eBD)
+Anova(lm_pdist_eBD)
 all_p_infected %>%
-    ggplot(aes(x=eBD_log, y=p_BC)) +
+    ggplot(aes(x=eBD_log, y=p_dist)) +
     geom_point(aes(color=species), cex=4)
 
 # Remove non-infected individuals and re-run
-lm_pbc_eBD_nozeros <- lm(p_BC ~ species*eBD_log_infected, data=all_p_infected)
-anova(lm_pbc_eBD_nozeros)
-Anova(lm_pbc_eBD_nozeros)
+lm_pdist_eBD_nozeros <- lm(p_dist ~ species*eBD_log_infected, data=all_p_infected)
+anova(lm_pdist_eBD_nozeros)
+Anova(lm_pdist_eBD_nozeros)
 all_p_infected %>%
-    ggplot(aes(x=eBD_log_infected, y=p_BC)) +
+    ggplot(aes(x=eBD_log_infected, y=p_dist)) +
     geom_point(aes(color=species), cex=4)
 
 #### Dispersion and PABD ####
@@ -760,12 +776,12 @@ all_p_infected %>%
 #' (2a) Does BD infection state affect microbiome dispersion?
 # 
 
-lm_pdist_PABD <- lm(p_BCdist ~ species*PABD, data=all_p_infected)
-anova(lm_pdist_PABD) ## SIG
-Anova(lm_pdist_PABD)
+lm_pdisper_PABD <- lm(p_disper ~ species*PABD, data=all_p_infected)
+anova(lm_pdisper_PABD) ## SIG interaction?
+Anova(lm_pdisper_PABD)
 all_p_infected %>%
     mutate(PABD = factor(PABD)) %>%
-    ggplot(aes(x=PABD, y=p_BCdist)) +
+    ggplot(aes(x=PABD, y=p_disper)) +
     geom_boxplot() +
     geom_point(aes(color=species), cex=4, position=position_jitter(width=0.15, height=0))+
     facet_wrap(~species, nrow=1)
@@ -775,20 +791,20 @@ all_p_infected %>%
 #' (2b) Does BD infection intensity affect microbiome dispersion?
 #' 
 
-lm_pbcdist_eBD <- lm(p_BCdist ~ species*eBD_log, data=all_p_infected)
-anova(lm_pbcdist_eBD)
-Anova(lm_pbcdist_eBD)
+lm_pdisper_eBD <- lm(p_disper ~ species*eBD_log, data=all_p_infected)
+anova(lm_pdisper_eBD)
+Anova(lm_pdisper_eBD)
 all_p_infected %>%
-    ggplot(aes(x=eBD_log, y=p_BCdist)) +
+    ggplot(aes(x=eBD_log, y=p_disper)) +
     geom_point(aes(color=species), cex=4)
 
 # Remove non-infected individuals and re-run
 
-lm_pbcdist_eBD_nozros <- lm(p_BCdist ~ species*eBD_log_infected, data=all_p_infected)
-anova(lm_pbcdist_eBD_nozros)
-Anova(lm_pbcdist_eBD_nozros)
+lm_pdisper_eBD_nozros <- lm(p_disper ~ species*eBD_log_infected, data=all_p_infected)
+anova(lm_pdisper_eBD_nozros)
+Anova(lm_pdisper_eBD_nozros)
 all_p_infected %>%
-    ggplot(aes(x=eBD_log_infected, y=p_BCdist)) +
+    ggplot(aes(x=eBD_log_infected, y=p_disper)) +
     geom_point(aes(color=species), cex=4)
 
 #### Inhibitory and PABD ####
@@ -834,7 +850,7 @@ all_p_infected %>%
     ggplot(aes(x=eBD_log_infected, y=p_inhibRich)) +
     geom_point(aes(col=species), cex=3) 
 
-# No do percent inhibitory
+# Now do percent inhibitory
 lm_ppercInhib_eBD <- lm(p_percInhib ~  species*eBD_log, data=all_p_infected)
 anova(lm_ppercInhib_eBD)
 Anova(lm_ppercInhib_eBD, type = 2)
@@ -852,28 +868,69 @@ all_p_infected %>%
     geom_point(aes(col=species), cex=3) +
     facet_wrap(~species, nrow=1)
 
+
 #### FOLLOW UP ####
+# get all mf values
+mf_all_without_init_infect <- mf.rare %>% 
+    filter(SampleID %in%c(mf_con_without_init_infect$SampleID, mf_treat_without_init_infect$SampleID) )
 
-
+# combine all_p?
 # Is OTU richness and inhibitory bacterial richness related?
-
-all_p %>%
-    ggplot(aes(x=p_rich, y=p_inhibRich)) +
+all_p_withcon <- all_p_withcon %>%
+    separate(toadID, into=c("species","indiv"), remove = FALSE)
+all_p_withcon %>%
+    ggplot(aes(x=p_logRich, y=p_inhibRich)) +
     geom_point(aes(col=species), cex=3) +
     geom_smooth(method="lm")
-anova(lm(p_inhibRich ~ p_rich, data=all_p))
+anova(lm(p_inhibRich ~ p_logRich*species, data=all_p_withcon))
+Anova(lm(p_inhibRich ~ p_logRich*species, data=all_p_withcon), type="II")
 
 # No, it's not-- it means it's decoupled
-
 
 # Is percent inhibitory and inhibitory bacterial richness related?
 
-all_p %>%
-    ggplot(aes(x=p_pinhib, y=p_inhibRich)) +
+all_p_withcon %>%
+    ggplot(aes(x=p_percInhib, y=p_inhibRich)) +
     geom_point(aes(col=species), cex=3) +
     geom_smooth(method="lm")
-anova(lm(p_inhibRich ~ p_pinhib, data=all_p))
+anova(lm(p_inhibRich ~ p_percInhib*species, data=all_p))
+Anova(lm(p_inhibRich ~ p_percInhib*species, data=all_p), type="II")
 
-# No, it's not-- it means it's decoupled
+
+# Is diversity/richness correlated with stability?
+all_p_withcon %>%
+    ggplot(aes(x=p_logRich, y=p_dist)) +
+    geom_point(aes(col=species), cex=3) +
+    geom_smooth(method="lm")
+anova(lm(p_dist ~ p_logRich*species, data=all_p))
+Anova(lm(p_dist ~ p_logRich*species, data=all_p), type="II")
 
 
+#### Inhibitory ASVs: who is important? ####
+
+# remove things that are absent in both
+zero_genera <- rbind(mf_con_with_inhibOTUs, mf_treat_with_inhibOTUs) %>%
+    group_by(G) %>%
+    summarize(total=sum(reads)) %>%
+    filter(total==0) %>%
+    pull(G)
+
+# Collapse by genus
+# Combined version
+mf_treat_with_inhibOTUs$TreatmentGroup <- "Treatment"
+mf_con_with_inhibOTUs$TreatmentGroup <- "Control"
+
+mf_combo_with_inhibOTUs_G <- rbind(mf_treat_with_inhibOTUs,mf_con_with_inhibOTUs) %>%
+    filter(!(G %in% zero_genera)) %>%
+    group_by(SampleID, species, time, toadID, eBD_log, PABD, prepost,TreatmentGroup, OTUID, K, P, C, O, `F`, G) %>%
+    summarize(genus_proportion = sum(reads))   %>%
+    group_by(G) %>%
+    mutate(max_g_prop = max(genus_proportion)) %>%
+    ungroup() %>%
+    mutate(standardized_g = ifelse(max_g_prop>0,genus_proportion/max_g_prop,0)) 
+
+mf_combo_with_inhibOTUs_G %>%
+    ggplot(aes(x=time, y=genus_proportion, col=species), cex=0.1) +
+    geom_point(alpha=0.3) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(G~TreatmentGroup, scales = "free")

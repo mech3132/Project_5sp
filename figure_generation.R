@@ -21,6 +21,7 @@ load("otu.inhibOnly.con.RData")
 load("all_p.RData")
 load("all_p_infected.RData")
 load("con_exp_indiv.RData")
+load("all_p_withcon.RData")
 
 # add a species column and PABD column
 all_p <- all_p %>%
@@ -32,7 +33,7 @@ all_p_infected <- all_p_infected %>%
     separate(toadID, into=c("species","indiv"), remove=FALSE)
 
 #### experimental design ####
-pdf(file = "FIGURES/experimental_design.pdf", width = 5,height = 12)
+pdf(file = "FIGURES/experimental_design.pdf", width = 6,height = 12)
 mf.rare %>%
     separate(toadID, into=c("sp2", "indiv"), remove = FALSE) %>%
     mutate(indiv = factor(indiv, levels=c("1","2","3","4","5","6","7","8","9","10","11","12"))) %>%
@@ -47,7 +48,8 @@ mf.rare %>%
     geom_point(aes(group=toadID, col=Contaminated), cex=1, pch=19)+ ## NEW LINE
     facet_wrap(~species, nrow=5) +
     xlab("Time") +
-    ylab("Individual Toad")
+    ylab("Individual Toad") + 
+    theme_classic()
 dev.off()
 
 
@@ -64,12 +66,7 @@ gg_NMDS <- mf_con_without_init_infect %>%
     geom_point(aes(col=species, alpha=(time)),  cex=2.5, show.legend = FALSE) +
     # geom_polygon(data = hull_toad, aes(fill=species), alpha = 0.1) +
     theme_classic()
-# gg_infect <- mf_treat_without_init_infect  %>%
-#     ggplot(aes(x=species, y=eBD_log)) +
-#     geom_point(aes(col=species), cex=2, position = position_jitter(width=0.1, height=0.05), show.legend = FALSE)+
-#     xlab("Species") +
-#     ylab("log Bd Load") +
-#     theme_classic()
+
 gg_infect <- mf_treat_without_init_infect  %>%
     group_by(species, toadID) %>%
     summarize(eBD_log = max(eBD_log)) %>%
@@ -92,14 +89,19 @@ temp3 <- mf_con_without_init_infect %>%
     mutate(metric="Percent_Inhibitory")%>%
     rename(value=percInhib)
 temp4 <- mf_con_without_init_infect %>%
+    dplyr::select(species, disper_bray_curtis) %>%
+    mutate(metric="Dispersion_from_centroid")%>%
+    rename(value=disper_bray_curtis)
+temp5 <- mf_con_without_init_infect %>%
     dplyr::select(species, distance_bray_curtis) %>%
-    mutate(metric="Bray_Curtis_Distance")%>%
+    mutate(metric="Distance_from_previous_timepoint")%>%
     rename(value=distance_bray_curtis)
 
-gg_all <- rbind(temp1,temp2,temp3,temp4) %>%
+
+gg_all <- rbind(temp1,temp2,temp3,temp4, temp5) %>%
     rename(Species=species) %>%
-    mutate(metric = factor(metric, levels=c("log_OTU_Richness","Inhibitory_OTU_Richness","Percent_Inhibitory","Bray_Curtis_Distance"))) %>%
     mutate(Metric = gsub("_"," ",metric, fixed=TRUE)) %>%
+    mutate(Metric = factor(Metric, levels=c("log OTU Richness","Dispersion from centroid", "Distance from previous timepoint","Inhibitory OTU Richness","Percent Inhibitory"))) %>%
     ggplot(aes(x=Species, y=value)) +
     geom_boxplot() +
     geom_point(aes(col=Species), position = position_jitter(width=0.1, height=0), alpha=1/3)+
@@ -109,7 +111,7 @@ gg_all <- rbind(temp1,temp2,temp3,temp4) %>%
 lay <- rbind(c(1,2),
              c(3,2))
 
-pdf("FIGURES/data_summary_controls.pdf", height = 8, width = 8)
+pdf("FIGURES/data_summary_controls.pdf", height = 10, width = 8)
 grid.arrange(gg_NMDS, gg_all, gg_infect, layout_matrix = lay)
 dev.off()
 
@@ -195,7 +197,7 @@ mf_treat_with_inhibOTUs <- mf_treat_without_init_infect %>%
     left_join(otu_long_treat)%>%
     mutate(taxa = (inhib.tb[match(OTUID, inhib.tb$seq),"taxa"])$taxa ) %>%
     separate(taxa, into = c("K","P","C","O","F","G"), sep = ";", remove = FALSE, fill="left")
-
+save(mf_treat_with_inhibOTUs, file="mf_treat_with_inhibOTUs.Rdata")
 
 ## Control
 # Going to leave zeros in for now, bc only 3-5 in each control and treatment
@@ -213,7 +215,7 @@ mf_con_with_inhibOTUs <- mf_con_without_init_infect %>%
     left_join(otu_long_con)%>%
     mutate(taxa = (inhib.tb[match(OTUID, inhib.tb$seq),"taxa"])$taxa ) %>%
     separate(taxa, into = c("K","P","C","O","F","G"), sep = ";", remove = FALSE, fill="left")
-
+save(mf_con_with_inhibOTUs, file="mf_con_with_inhibOTUs.RData")
 
 ## PLot
 mf_con_with_inhibOTUs_summarized <- mf_con_with_inhibOTUs %>%
@@ -227,26 +229,6 @@ mf_treat_with_inhibOTUs_summarized <- mf_treat_with_inhibOTUs %>%
 mf_combined_with_inhibOTUS_summarized <- full_join(mf_con_with_inhibOTUs_summarized, mf_treat_with_inhibOTUs_summarized, by=c("time","species","G","AverageProportion","Group"))
 
 
-# 
-# gg_conpercinhib <- mf_con_with_inhibOTUs %>%
-#     group_by(toadID, time, species, G) %>%
-#     summarise(AverageProportion = mean(reads)) %>%
-#     ggplot(aes(x=time, y=AverageProportion)) +
-#     geom_bar(aes(fill=G), stat="identity", show.legend = FALSE) +
-#     theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.key.size =  unit(0.2, "cm") ) +
-#     facet_wrap(~species, nrow=1) +
-#     scale_fill_manual(values=set_col) +
-#     geom_vline(aes(xintercept=5.5), col="grey", lty=2)
-# gg_treatpercinhib <- mf_treat_with_inhibOTUs %>%
-#     group_by(toadID, time, species, G) %>%
-#     summarise(AverageProportion = mean(reads)) %>%
-#     ggplot(aes(x=time, y=AverageProportion)) +
-#     geom_bar(aes(fill=G), stat="identity", show.legend = FALSE) +
-#     theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.key.size =  unit(0.2, "cm") ) +
-#     facet_wrap(~species, nrow=1) +
-#     scale_fill_manual(values=set_col) +
-#     geom_vline(aes(xintercept=5.5), col="grey", lty=2)
-# 
 g_legend <- function(a.gplot){ # from stack overflow
     tmp <- ggplot_gtable(ggplot_build(a.gplot))
     leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
@@ -312,14 +294,6 @@ for ( inhib in allInhibTaxa) {
     }
 }
 
-# mf_con_statdiff %>%
-#     filter(!is.na(significant)) %>%
-#     ggplot(aes(x=G)) +
-#     geom_point(aes(y=temp, col=species, pch=significant), cex=2, position=position_jitter(width=0, height=0.25)) +
-#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-#     scale_shape_manual(values=c(21,19)) +
-#     geom_hline(aes(yintercept=0))
-
 
 # TREAT
 
@@ -358,24 +332,9 @@ for ( inhib in allInhibTaxa) {
     }
 }
 
-# mf_treat_statdiff %>%
-#     filter(!is.na(significant)) %>%
-#     ggplot(aes(x=G)) +
-#     geom_point(aes(y=temp, col=species, pch=significant), cex=2, position=position_jitter(width=0, height=0.25)) +
-#     theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-#     scale_shape_manual(values=c(21,19)) +
-#     geom_hline(aes(yintercept=0))
 
 ####### Looking at specific OTUs #########
 
-# CONTROL 
-# mf_con_statdiff <- mf_con_with_inhibOTUs %>%
-#     group_by(toadID, species, prepost, G) %>%
-#     summarize(meanReads=mean(reads), meanBd = mean(eBD_log)) %>%
-#     dplyr::select(-meanBd) %>%
-#     spread(key=prepost, value=meanReads) %>%
-#     mutate(fc=log((Pos-Pre)/Pre +1), significant = NA, p=NA) %>%
-#     mutate(temp= ifelse(is.finite(fc), fc, ifelse(is.infinite(fc), 10, 0))) 
 mf_con_statdiff <- mf_con_with_inhibOTUs %>%
     group_by(toadID, species, prepost, G) %>%
     summarize(meanReads=mean(reads), meanBd = mean(eBD_log)) %>%
@@ -453,6 +412,14 @@ mf_con_statdiff$Group <- "Control"
 mf_treat_statdiff$Group <- "Treatment"
 mf_combined_statdiff <- full_join(mf_con_statdiff, mf_treat_statdiff)
 
+# PROPORTION OF SAMPLES THAT ARE SIGNIFICANTLY DIFFERENT
+pdf("fold_change_inhib_histograms.pdf")
+par(mfrow=c(1,2))
+hist(mf_con_statdiff$fc, main="Control Fold Change", xlab="Fold Change", freq=FALSE, xlim=c(-7,7))
+hist(mf_treat_statdiff$fc, main="Treat Fold Change", ylab="Fold Change", freq=FALSE, xlim=c(-7,7))
+dev.off()
+
+
 pdf("FIGURES/otu_change.pdf", width=5, height=5)
 mf_combined_statdiff %>%
     rename(FoldChange=temp, Species=species, Significant=significant, Genus=G) %>%
@@ -472,22 +439,90 @@ mf_combined_statdiff %>%
 dev.off()
 
 
+### TESTING: tyring to separate infected vs non-infected treatment groups ####
+
+# TREAT
+
+pos_abund <- mf_treat_with_inhibOTUs %>%
+    filter(prepost=="Pos") %>%
+    group_by(toadID, species, prepost,G) %>%
+    summarize(meanReads=mean(reads), meanBD=mean(eBD_log)) %>%
+    spread(key=prepost, value=meanReads) 
+
+pre_abund <- mf_treat_with_inhibOTUs %>%
+    filter(prepost=="Pre") %>%
+    group_by(toadID, species, prepost,G) %>%
+    summarize(meanReads=mean(reads)) %>%
+    spread(key=prepost, value=meanReads)
+
+temp <- full_join(pos_abund, pre_abund) %>%
+    mutate(diff=Pos-Pre, significant = NA, p=NA) %>%
+    mutate(fc=log((Pos-Pre)/Pre +1), significant = NA, p=NA) %>%
+    mutate(temp= ifelse(is.finite(fc), fc, ifelse(fc>0, 10, -10)))
+
+temp %>%
+    ggplot(aes(x=meanBD, y=diff)) +
+    geom_point(aes(col=G)) +
+    facet_wrap(~species)
 
 
 #### Correlation between Richness and Inhibitory Richness ####
 
 pdf("FIGURES/corr_rich_inhibrich.pdf", width=5, height=4)
-all_p %>%
-    dplyr::select(toadID, exp_rich, p_rich, exp_inhibRich, p_inhibRich) %>%
-    # full_join(con_exp_indiv, by = "toadID") %>%
-    rbind(con_exp_indiv) %>%
-    dplyr::select(p_inhibRich, p_rich, toadID) %>%
+all_p_withcon %>%
+    dplyr::select(p_inhibRich, p_logRich, toadID) %>%
     separate(toadID, into=c("species","n"), remove=FALSE) %>%
     rename(Species=species) %>%
-    ggplot(aes(x=p_rich, y=p_inhibRich)) +
+    ggplot(aes(x=p_logRich, y=p_inhibRich)) +
     geom_point(aes(col=Species), cex=3) +    
     ylab("OTU Richness (Percentile of species)") + 
     xlab("Inhibitory OTU Richness (Percentile of species)")
+dev.off()
+
+
+pdf("FIGURES/corr_rich__prich_inhibrich.pdf", width=10, height=4)
+grid.arrange(all_p_withcon %>%
+                 dplyr::select(toadID, p_inhibRich, p_logRich, p_percInhib) %>%
+                 separate(toadID, into=c("species","n"), remove=FALSE) %>%
+                 rename(Species=species) %>%
+                 ggplot(aes(x=p_logRich, y=p_inhibRich)) +
+                 geom_point(aes(col=Species), cex=1, position=position_jitter(height=0.5, width=0.5), show.legend = FALSE) +    
+                 ylab("ASV Richness (log observed ASVs)") + 
+                 xlab("Inhibitory ASV Richness")
+             , all_p_withcon %>%
+                 dplyr::select(toadID, p_inhibRich, p_logRich, p_percInhib) %>%
+                 separate(toadID, into=c("species","n"), remove=FALSE) %>%
+                 rename(Species=species) %>%
+                 ggplot(aes(x=p_percInhib, y=p_inhibRich)) +
+                 geom_point(aes(col=Species), cex=1, position=position_jitter(height=0.5, width=0.5)) +    
+                 ylab("Percent Inhibitory (as proportion of total reads)") + 
+                 xlab("Inhibitory ASV Richness")
+             , nrow=1
+)
+dev.off()
+
+mf.all.without_init_infect <- mf.rare %>%
+    filter(SampleID %in% c(mf_con_without_init_infect$SampleID, mf_treat_without_init_infect))
+
+pdf("FIGURES/corr_rich__prich_inhibrich_RAW.pdf", width=10, height=4)
+grid.arrange(mf.all.without_init_infect %>%
+    dplyr::select(toadID, inhibRich, logRich, percInhib) %>%
+    separate(toadID, into=c("species","n"), remove=FALSE) %>%
+    rename(Species=species) %>%
+    ggplot(aes(x=logRich, y=inhibRich)) +
+    geom_point(aes(col=Species), cex=1, position=position_jitter(height=0.5, width=0.5), show.legend = FALSE) +    
+    ylab("ASV Richness (log observed ASVs)") + 
+    xlab("Inhibitory ASV Richness")
+, mf.all.without_init_infect %>%
+    dplyr::select(toadID, inhibRich, logRich, percInhib) %>%
+    separate(toadID, into=c("species","n"), remove=FALSE) %>%
+    rename(Species=species) %>%
+    ggplot(aes(x=percInhib, y=inhibRich)) +
+    geom_point(aes(col=Species), cex=1, position=position_jitter(height=0.5, width=0.5)) +    
+    ylab("Percent Inhibitory (as proportion of total reads)") + 
+    xlab("Inhibitory ASV Richness")
+, nrow=1
+)
 dev.off()
 
 
@@ -511,16 +546,16 @@ gg_logrich_fit <- mf_con_without_init_infect %>%
 
 ## Dispersion
 
-disp.normfit <- fitdistr(x=mf_con_without_init_infect$distance.to.centroid, densfun = "normal")
-disp.lognormfit <- fitdistr(x=mf_con_without_init_infect$distance.to.centroid, densfun = "lognormal")
-x.pred <- seq(min(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)-sd(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)
-              , max(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)+sd(mf_con_without_init_infect$distance.to.centroid, na.rm = TRUE)
+disp.normfit <- fitdistr(x=mf_con_without_init_infect$disper_bray_curtis, densfun = "normal")
+disp.lognormfit <- fitdistr(x=mf_con_without_init_infect$disper_bray_curtis, densfun = "lognormal")
+x.pred <- seq(min(mf_con_without_init_infect$disper_bray_curtis, na.rm = TRUE)-sd(mf_con_without_init_infect$disper_bray_curtis, na.rm = TRUE)
+              , max(mf_con_without_init_infect$disper_bray_curtis, na.rm = TRUE)+sd(mf_con_without_init_infect$disper_bray_curtis, na.rm = TRUE)
               , length.out = 100)
 y.expect.norm <- dnorm(x=x.pred, mean=disp.normfit$estimate[1], sd=disp.normfit$estimate[2])
 y.expect.lognorm <- dlnorm(x=x.pred, meanlog=disp.lognormfit$estimate[1], sdlog = disp.lognormfit$estimate[2])
 
 gg_disp_fit <- mf_con_without_init_infect %>%
-    ggplot(aes(x=distance.to.centroid, y=..density..)) +
+    ggplot(aes(x=disper_bray_curtis, y=..density..)) +
     geom_histogram(bins=25) +
     geom_line(data=data.frame(x=x.pred, y=y.expect.norm), aes(x=x, y=y), col="red") +
     geom_line(data=data.frame(x=x.pred, y=y.expect.lognorm), aes(x=x, y=y), col="blue") 
@@ -578,3 +613,174 @@ gg_percInhib_fit <- mf_con_without_init_infect %>%
 pdf("FIGURES/comparison_fits.pdf", width=6, height=4)
 grid.arrange(gg_logrich_fit, gg_disp_fit, gg_instab_fit, gg_inhibRich_fit, gg_percInhib_fit, nrow=2)
 dev.off()
+
+#### Inhibitory taxa
+
+# remove things that are absent in both
+zero_genera <- rbind(mf_con_with_inhibOTUs, mf_treat_with_inhibOTUs) %>%
+    group_by(G) %>%
+    summarize(total=sum(reads)) %>%
+    filter(total==0) %>%
+    pull(G)
+
+# Collapse by genus
+# Combined version
+mf_treat_with_inhibOTUs$TreatmentGroup <- "Treatment"
+mf_con_with_inhibOTUs$TreatmentGroup <- "Control"
+
+mf_combo_with_inhibOTUs_G <- rbind(mf_treat_with_inhibOTUs,mf_con_with_inhibOTUs) %>%
+    filter(!(G %in% zero_genera)) %>%
+    group_by(SampleID, species, time, toadID, eBD_log, PABD, prepost,TreatmentGroup, OTUID, K, P, C, O, `F`, G) %>%
+    summarize(genus_proportion = sum(reads))   %>%
+    group_by(G) %>%
+    mutate(max_g_prop = max(genus_proportion)) %>%
+    ungroup() %>%
+    mutate(standardized_g = ifelse(max_g_prop>0,genus_proportion/max_g_prop,0)) 
+
+pdf("FIGURES/inhib_taxa_all.pdf", height=50, width=5)
+mf_combo_with_inhibOTUs_G %>%
+    ggplot(aes(x=time, y=genus_proportion, col=species), cex=0.1) +
+    geom_point(alpha=0.3) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(G~TreatmentGroup, scales = "free")
+dev.off()
+
+
+# summary of all individuals and species counts
+summary_individuals <- mf_combo_with_inhibOTUs_G %>%
+    group_by(toadID, TreatmentGroup) %>%
+    summarize(species=unique(species))
+# how many controls in each group?
+con_counts <- table(summary_individuals %>%
+    filter(TreatmentGroup=="Control") %>%
+    pull(species))
+# how many treatment in each group?
+treat_counts <- table(summary_individuals %>%
+                        filter(TreatmentGroup=="Treatment") %>%
+                        pull(species))
+
+## Making numbered controls and treatment individuals for facetting
+numbered_indiv <- mf_combo_with_inhibOTUs_G %>%
+    group_by(toadID) %>%
+    summarize(TreatmentGroup=unique(TreatmentGroup)) %>%
+    separate(col=toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(indiv = as.numeric(indiv)) %>%
+    arrange(species, TreatmentGroup, indiv)
+runlength <- numbered_indiv %>%
+    pull(TreatmentGroup) %>%
+    rle()
+numbered_indiv$new_indiv <- sequence(runlength$lengths)
+
+# Making custom legend
+unique(mf_combo_with_inhibOTUs_G$G)
+color_taxa <- c(
+    "Pseudomonas"="purple"
+    , "Acinetobacter"="orange"
+    ,"Brevundimonas"="lightblue"             
+    , "Rhizobium" ="brown"
+    ,"Stenotrophomonas"="darkseagreen1"
+    ,"Lysobacter" ="orange3"                 
+    ,"Flavobacterium"="goldenrod"
+    ,"Pedobacter"="darkmagenta"
+    ,"Sphingobacterium" ="olivedrab1"          
+    ,"Novosphingobium"="magenta"
+    ,"Serratia"="orangered2"
+    ,"Dyella"="mediumvioletred"                     
+    ,"Terrimonas"="darkolivegreen4"
+    ,"Elizabethkingia"="slateblue1"
+    ,"Empedobacter"  ="grey"                
+    , "Chryseobacterium"="forestgreen"
+    ,"Arthrobacter"="saddlebrown"
+    ,"Microbacterium" ="pink"               
+    ,"Brevibacterium"="blue"
+    ,"Ralstonia"="plum"
+    ,"Burkholderiales_incertae_sedis"="gold"
+    ,"Variovorax"="cyan3"
+    ,"Mitsuaria"="darkslateblue"
+    ,"Duganella" ="yellow"                    
+    , "Janthinobacterium"="purple3"
+    ,"Delftia"="green"
+    ,"Chitinimonas"    ="wheat1"              
+    ,"Lactococcus"="deepskyblue"
+    ,"Bacillus"    ="mediumpurple1"  
+)
+
+### Control plotting
+mf_combo_with_inhibOTUs_G$Indiv <- pull(numbered_indiv[match(mf_combo_with_inhibOTUs_G$toadID, numbered_indiv$toadID),"new_indiv"])
+totalAbund <- mf_combo_with_inhibOTUs_G %>%
+    group_by(SampleID,toadID, time) %>%
+    summarize(totalAbund=sum(genus_proportion)) %>%
+    ungroup()
+mf_combo_with_inhibOTUs_G$totalAbund <- pull(totalAbund[match(mf_combo_with_inhibOTUs_G$SampleID, totalAbund$SampleID),"totalAbund"])
+pdf("FIGURES/inhib_taxa_con.pdf", width=10, height=5)
+mf_combo_with_inhibOTUs_G %>%
+    filter(TreatmentGroup=="Control") %>%
+    mutate(toadID = factor(toadID), time=factor(time), `Proportional Abundance`=genus_proportion, Time=time) %>%
+    ggplot() +
+    geom_bar(aes(x=Time, y=`Proportional Abundance`, fill=G), stat="identity", na.rm = FALSE, show.legend = TRUE) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(species~Indiv, scales = "free_y", drop = FALSE) +
+    theme(
+        strip.text.x = element_blank()
+    ) +
+    scale_fill_manual(values=color_taxa) +
+    theme(legend.key.size = unit(0.25, "cm"), axis.text.x = element_text(size=5))
+
+dev.off()
+
+pdf("FIGURES/inhib_taxa_treat.pdf", width=12, height=5)
+mf_combo_with_inhibOTUs_G %>%
+    filter(TreatmentGroup=="Treatment") %>%
+    mutate(toadID = factor(toadID), time=factor(time), `Proportional Abundance`=genus_proportion, Time=time) %>%
+    ggplot() +
+    geom_bar(aes(x=Time, y=`Proportional Abundance`, fill=G), stat="identity", na.rm = FALSE, show.legend = TRUE) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(species~Indiv, scales = "free_y", drop = FALSE) +
+    theme(
+        strip.text.x = element_blank()
+    ) +
+    scale_fill_manual(values=color_taxa)+
+    scale_color_continuous(low="white",high="darkred")+
+    theme(legend.key.size = unit(0.25, "cm"), axis.text.x = element_text(size=5)) +
+    geom_point(aes(x=Time,y=(totalAbund+0.05), col=eBD_log), pch=8, cex=0.2)
+dev.off()
+
+
+pdf("FIGURES/combined_inhib_taxa_indiv.pdf",width=12, height=10 )
+gg1 <- mf_combo_with_inhibOTUs_G %>%
+    filter(TreatmentGroup=="Control") %>%
+    mutate(toadID = factor(toadID), time=factor(time), `Proportional Abundance`=genus_proportion, Time=time) %>%
+    ggplot() +
+    geom_bar(aes(x=Time, y=`Proportional Abundance`, fill=G), stat="identity", na.rm = FALSE, show.legend = TRUE) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(species~Indiv, scales = "free_y", drop = FALSE) +
+    theme(
+        strip.text.x = element_blank()
+    ) +
+    scale_fill_manual(values=color_taxa) +
+    theme(legend.key.size = unit(0.25, "cm"), axis.text.x = element_text(size=5)) +
+    labs(title="CONTROLS")
+gg2 <-  mf_combo_with_inhibOTUs_G %>%
+    filter(TreatmentGroup=="Treatment") %>%
+    mutate(toadID = factor(toadID), time=factor(time), `Proportional Abundance`=genus_proportion, Time=time) %>%
+    ggplot() +
+    geom_bar(aes(x=Time, y=`Proportional Abundance`, fill=G), stat="identity", na.rm = FALSE, show.legend = FALSE) +
+    geom_vline(aes(xintercept=5.5), col="grey", lty=2) +
+    facet_grid(species~Indiv, scales = "free_y", drop = FALSE) +
+    theme(
+        strip.text.x = element_blank()
+    ) +
+    scale_fill_manual(values=color_taxa)+
+    scale_color_continuous(low="white",high="darkred")+
+    theme(legend.key.size = unit(0.25, "cm"), axis.text.x = element_text(size=5)) +
+    geom_point(aes(x=Time,y=(totalAbund+0.05), col=eBD_log), pch=8, cex=0.2)+
+    labs(title="TREATMENT")
+grid.arrange(gg1
+             ,gg2
+             # , layout_matrix <- rbind(c(1,2,2))
+             )
+dev.off()
+
+
+
+
