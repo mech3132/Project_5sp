@@ -413,7 +413,7 @@ mf_treat_statdiff$Group <- "Treatment"
 mf_combined_statdiff <- full_join(mf_con_statdiff, mf_treat_statdiff)
 
 # PROPORTION OF SAMPLES THAT ARE SIGNIFICANTLY DIFFERENT
-pdf("fold_change_inhib_histograms.pdf")
+pdf("FIGURES/fold_change_inhib_histograms.pdf")
 par(mfrow=c(1,2))
 hist(mf_con_statdiff$fc, main="Control Fold Change", xlab="Fold Change", freq=FALSE, xlim=c(-7,7))
 hist(mf_treat_statdiff$fc, main="Treat Fold Change", ylab="Fold Change", freq=FALSE, xlim=c(-7,7))
@@ -437,7 +437,6 @@ mf_combined_statdiff %>%
     geom_hline(aes(yintercept=c(10)), lty=3, col="grey") +
     facet_grid(Group ~ .) 
 dev.off()
-
 
 ### TESTING: tyring to separate infected vs non-infected treatment groups ####
 
