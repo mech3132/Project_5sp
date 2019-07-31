@@ -202,10 +202,11 @@ mf <- mf %>% # mapping file with controls still in it
     filter(prepost == "Pre" | prepost == "Pos") %>% # get rid of things in "tre", which is a different experiment
     separate(timepoint, into=c("exposure","time"), sep="_", convert=TRUE) %>% # create a time variable
     mutate( time = ifelse(exposure == "Pre", time, time + 5)) %>% # time variable "restarts" at BD exposure point, but I want it to be continuous
-    mutate(species=ifelse(species=="Bubo","Anbo",ifelse(species=="Buma","Anma",ifelse(species=="Raca","Lica",ifelse(species=="Rapi","Lipi",species))))) %>%
+    mutate(species=ifelse(species=="Bubo","Anbo",ifelse(species=="Buma","Rhma",species))) %>%
     separate(toadID, into=c("todelete","ID"), sep="_",remove=TRUE) %>%
     unite(toadID, species,ID, sep = "_", remove = FALSE) %>%
-    dplyr::select(-todelete, -ID)
+    dplyr::select(-todelete, -ID) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 
 #### Adjusting values in mf for Osse and Anbo ####
 
@@ -243,14 +244,14 @@ any(table(dplyr::select(mf.tb, toadID, time)) > 1)
 #+ message=FALSE, echo=FALSE, warnings=FALSE, include=FALSE
 table(dplyr::select(mf.tb, toadID, time))>1
 # Lica10 has 2 timepoint 3's
-# Anma11 has 2 time point 3's
+# Rhma11 has 2 time point 3's
 # I think this is just a mistake in the data entry. I've gone through the rest of the metadata and determined that 
 #   it is probably mis-labeled so:
 # I'm going to manually change:
-# I think mck115Pre.3Buma.11.452405 Anma11 timepoint 3 is actually Anma9, time 3
+# I think mck115Pre.3Buma.11.452405 Rhma11 timepoint 3 is actually Rhma9, time 3
 # I think mck105Pre.3Raca.10.451190 Lica10 timepoint 3 is actually Lica9, time 3
-mf.tb[mf.tb$SampleID == "mck115Pre.3Buma.11.452405",c("toadID")] <- "Anma_9"
-mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Lica_9"
+mf.tb[mf.tb$SampleID == "mck115Pre.3Buma.11.452405",c("toadID")] <- "Rhma_9"
+mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Raca_9"
 
 #### Adjusting for individuals who were contaminated at the beginning
 
@@ -260,20 +261,20 @@ mf.tb[mf.tb$SampleID == "mck105Pre.3Raca.10.451190", c("toadID")] <- "Lica_9"
 #' provided by Val Mckenzie.
 #' 
 
-BD_contam_upon_arrival <- c("Anma_4"
-                            , "Anma_6"
-                            , "Anma_7"
-                            , "Anma_10"
-                            , "Anma_11"
-                            , "Lipi_1"
-                            , "Lipi_2"
-                            , "Lipi_5"
-                            , "Lipi_7"
-                            , "Lipi_8"
-                            , "Lipi_9"
-                            , "Lipi_10"
-                            , "Lipi_11"
-                            , "Lipi_12")
+BD_contam_upon_arrival <- c("Rhma_4"
+                            , "Rhma_6"
+                            , "Rhma_7"
+                            , "Rhma_10"
+                            , "Rhma_11"
+                            , "Rapi_1"
+                            , "Rapi_2"
+                            , "Rapi_5"
+                            , "Rapi_7"
+                            , "Rapi_8"
+                            , "Rapi_9"
+                            , "Rapi_10"
+                            , "Rapi_11"
+                            , "Rapi_12")
 
 # Add new column for individuals that were originally contamined
 mf.tb$orig_contam <- 0
@@ -717,9 +718,10 @@ pre_test_set <- mf_treat_without_init_infect %>%
 ## PLOT OF EXPECTED RCIHNESS FOR EACH SPECIES
 samps_lmer_shannon$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=shannon) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=shannon))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=shannon, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -775,7 +777,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 shannon_species_exp <- fixef(lmer_shannon)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi"))
 con_toad_est_shannon <- ranef(lmer_shannon)$toadID %>%
     rename(sp_est="(Intercept)") %>%
     mutate(toadID=rownames(ranef(lmer_shannon)$toadID)) %>%
@@ -797,12 +799,12 @@ for ( i in 1:nrow(con_toad_est_shannon) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
-
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 # Plot results 
 gg_shan_p <- ggplot(pre_exp_indiv, aes(x=p_shannon, y=log(infect+1))) +
-    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
+    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_smooth(method=lm, se=FALSE, col="black")
 # if we'd JUST plotted raw values
 gg_shan_raw <- ggplot(pre_exp_indiv, aes(x=exp_shannon, y=log(infect+1)))+
@@ -812,6 +814,7 @@ gg_shan_raw <- ggplot(pre_exp_indiv, aes(x=exp_shannon, y=log(infect+1)))+
 grid.arrange(gg_shan_p, gg_shan_raw, nrow=1)
 exp_distr %>%
     gather(key=species, value=shannon) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(aes(x=species, y=shannon)) +
     geom_violin() +
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_shannon, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
@@ -824,7 +827,8 @@ all_p <- pre_exp_indiv %>%
 if (RERUN_RICH) {
     lmer_logRich <- stan_lmer(logRich ~ -1 + species + (1|toadID), data=mf_con_without_init_infect
                            , prior = normal(0, 10, autoscale = TRUE)
-                           , seed = 98374)
+                           , seed = 98374
+                           , adapt_delta = 0.96)
     save(lmer_logRich, file="lmer_logRich.RData")
 } else {
     load(file="lmer_logRich.RData")
@@ -838,9 +842,10 @@ pre_test_set <- mf_treat_without_init_infect %>%
 # Plot of expected by species, and real samples
 samps_lmer_logRich$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=logRich) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=logRich))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=logRich, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -897,7 +902,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 logRich_species_exp <- fixef(lmer_logRich)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi"))
 con_toad_est_logRich <- ranef(lmer_logRich)$toadID %>%
     rename(sp_est="(Intercept)") %>%
     mutate(toadID=rownames(ranef(lmer_logRich)$toadID)) %>%
@@ -918,12 +923,13 @@ for ( i in 1:nrow(con_toad_est_logRich) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 
 # Plot results 
 gg_logRich_p <- ggplot(pre_exp_indiv, aes(x=p_logRich, y=log(infect+1))) +
-    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
+    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_smooth(method=lm, se=FALSE, col="black")
 # if we'd JUST plotted raw values
 gg_logRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_logRich, y=log(infect+1)))+
@@ -933,6 +939,7 @@ gg_logRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_logRich, y=log(infect+1)))+
 grid.arrange(gg_logRich_p, gg_logRich_raw, nrow=1)
 exp_distr %>%
     gather(key=species, value=logRich) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(aes(x=species, y=logRich)) +
     geom_violin() +
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_logRich, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
@@ -1028,10 +1035,11 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_disper$beta  <- samps_glmer_disper$beta %>%
     as.data.frame() %>%
-    mutate(Anbo=exp(V1), Anma=exp(V2), Lica=exp(V3), Lipi=exp(V4), Osse=exp(V5)) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse)
+    mutate(Anbo=exp(V1), Rhma=exp(V2), Osse=exp(V3), Raca=exp(V4), Rapi=exp(V5)) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi)
 samps_glmer_disper$beta %>%
     gather(key=species, value=disper_bray_curtis) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(mapping=aes(x=species, y=(disper_bray_curtis)))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=(disper_bray_curtis), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1059,6 +1067,7 @@ for ( num_sp in 1:length(species_list)) {
 
 exp_distr %>%
     gather(key=species, value=disper_bray_curtis) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(aes(x=species, y=disper_bray_curtis)) +
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=(disper_bray_curtis), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1109,7 +1118,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 disper_species_exp <- fixef(glmer_disper)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi"))
 
 con_toad_est_disper <- ranef(glmer_disper)$toadID %>%
     rename(sp_est="(Intercept)") %>%
@@ -1132,22 +1141,23 @@ for ( i in 1:nrow(con_toad_est_disper) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 
 # Plot results 
 gg_disper_p <- pre_exp_indiv %>%
     filter(!is.na(exp_disper)) %>%
     ggplot(aes(x=p_disper, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4) +
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4) 
+    geom_smooth(method=lm, se=FALSE) 
 # Raw numbers
 gg_disper_raw <- pre_exp_indiv %>%
     filter(!is.na(exp_disper)) %>%
     ggplot(aes(x=exp_disper, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4)+
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4)
+    geom_smooth(method=lm, se=FALSE) 
 grid.arrange(gg_disper_p, gg_disper_raw, nrow=1)
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_disper, p_disper) %>%
@@ -1259,14 +1269,16 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_dist$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
     mutate(Anbo=inv_logit(Anbo)
-           ,Anma=inv_logit(Anma)
-           ,Lica=inv_logit(Lica)
-           ,Lipi=inv_logit(Lipi)
-           ,Osse=inv_logit(Osse)) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+           ,Rhma=inv_logit(Rhma)
+           ,Osse=inv_logit(Osse)
+           ,Raca=inv_logit(Raca)
+           ,Rapi=inv_logit(Rapi)
+           ) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=distance_bray_curtis, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1340,7 +1352,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 dist_species_exp <- fixef(glmer_dist)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse","phi")) %>%
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi","phi")) %>%
     filter(species!="phi")
 
 
@@ -1365,10 +1377,13 @@ for ( i in 1:nrow(con_toad_est_dist) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
+
 
 exp_distr %>%
     gather(key="species",value="d") %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
     ggplot(aes(x=species, y=d)) +
     geom_violin() +
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_dist), col="red", position=position_jitter(width=0.1, height=0)) +
@@ -1378,16 +1393,16 @@ exp_distr %>%
 gg_beta_p <- pre_exp_indiv %>%
     filter(!is.na(p_dist)) %>%
     ggplot(aes(x=p_dist, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4) +
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4) 
+    geom_smooth(method=lm, se=FALSE) 
 # Raw numbers
 gg_beta_raw <- pre_exp_indiv %>%
     filter(!is.na(exp_dist)) %>%
     ggplot(aes(x=exp_dist, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4)+
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4)
+    geom_smooth(method=lm, se=FALSE)
 grid.arrange(gg_beta_p, gg_beta_raw, nrow=1)
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_dist, p_dist) %>%
@@ -1492,14 +1507,16 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_percInhib$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
     mutate(Anbo=inv_logit(Anbo)
-           ,Anma=inv_logit(Anma)
-           ,Lica=inv_logit(Lica)
-           ,Lipi=inv_logit(Lipi)
-           ,Osse=inv_logit(Osse)) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+           ,Rhma=inv_logit(Rhma)
+           ,Osse=inv_logit(Osse)
+           ,Raca=inv_logit(Raca)
+           ,Rapi=inv_logit(Rapi)
+           ) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=percInhib) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1572,7 +1589,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 percInhib_species_exp <- fixef(glmer_percInhib)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse","phi")) 
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi","phi")) 
 
 
 con_toad_est_percInhib <- ranef(glmer_percInhib)$toadID %>%
@@ -1596,10 +1613,13 @@ for ( i in 1:nrow(con_toad_est_percInhib) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
+
 
 exp_distr %>%
     gather(key="species",value="d") %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(aes(x=species, y=d)) +
     geom_violin() +
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_percInhib), col="red", position=position_jitter(width=0.1, height=0)) +
@@ -1609,16 +1629,16 @@ exp_distr %>%
 gg_pinhib_p <- pre_exp_indiv %>%
     filter(!is.na(p_percInhib)) %>%
     ggplot(aes(x=p_percInhib, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4) +
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4) 
+    geom_smooth(method=lm, se=FALSE) 
 # Raw numbers
 gg_pinhib_raw <- pre_exp_indiv %>%
     filter(!is.na(exp_percInhib)) %>%
     ggplot(aes(x=exp_percInhib, y=log(infect+1))) +
-    geom_smooth(method=lm, se=FALSE) +
+    geom_point(aes(color=species), cex=4)+
     geom_smooth(aes(col=species), method=lm, se=FALSE)+
-    geom_point(aes(color=species), cex=4)
+    geom_smooth(method=lm, se=FALSE) 
 grid.arrange(gg_pinhib_p, gg_pinhib_raw, nrow=1)
 all_p <- pre_exp_indiv %>%
     dplyr::select(toadID, exp_percInhib, p_percInhib) %>%
@@ -1686,10 +1706,11 @@ pre_test_set <- mf_treat_without_init_infect %>%
 new_samps_beta <- samps_glmer_inhibRich$beta %>%
     as.data.frame() %>%
     mutate(V0=samps_glmer_inhibRich$alpha[,1]) %>%
-    transmute(Anbo=V0, Anma=V0+V1, Lica=V0+V2, Lipi=V0+V3, Osse=V0+V4) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse)
+    transmute(Anbo=V0, Rhma=V0+V1, Osse=V0+V2, Raca=V0+V3, Rapi=V0+V4) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi)
 new_samps_beta %>% 
     gather(key=species, value=inhibRich) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=inhibRich))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=(inhibRich), x=species), position = position_jitter(width = 0.1, height=0.05), col="blue") +
@@ -1742,7 +1763,7 @@ for ( i in treat_indiv ) {
 # Get estimates for control toads
 inhib_species_exp <- fixef(glmer_inhibRich)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Anma","Lica","Lipi","Osse"))
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi"))
 inhib_species_exp$value[2:5] <- unlist(c(inhib_species_exp[1,1]+inhib_species_exp[2,1]
                                          , inhib_species_exp[1,1]+inhib_species_exp[3,1]
                                          , inhib_species_exp[1,1]+inhib_species_exp[4,1]
@@ -1768,21 +1789,23 @@ for ( i in 1:nrow(con_toad_est_inhib) ) {
 
 # create species column
 pre_exp_indiv <- pre_exp_indiv %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 
 # Plot results 
 gg_inhibRich_p <- ggplot(pre_exp_indiv, aes(x=p_inhibRich, y=log(infect+1))) +
-    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
+    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_smooth(method=lm, se=FALSE, col="black")
 gg_inhibRich_raw <- ggplot(pre_exp_indiv, aes(x=exp_inhibRich, y=log(infect+1))) +
-    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_point(aes(color=species), cex=4) +
+    geom_smooth(aes(color=species),method=lm, se = FALSE) +
     geom_smooth(method=lm, se=FALSE, col="black")
 grid.arrange(gg_inhibRich_p, gg_inhibRich_raw, nrow=1)
 
 exp_distr %>%
     gather(key=species, value=loginhibRich) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(aes(x=species, y=loginhibRich)) +
     geom_violin() +
     geom_point(data=pre_exp_indiv, aes(x=species, y=exp_inhibRich, col=log(infect+1)), cex=4, position=position_jitter(height=0, width=0.1))
@@ -1816,9 +1839,10 @@ post_test_set <- mf_treat_without_init_infect %>%
 ## PLOT OF EXPECTED RCIHNESS FOR EACH SPECIES
 samps_lmer_shannon_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3,Raca=V4, Rapi=V5) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=shannon) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=shannon))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=shannon, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1897,8 +1921,8 @@ pos_test_set <- mf_treat_without_init_infect %>%
 # Plot of expected by species, and real samples
 samps_lmer_rich_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=logRich) %>%
     ggplot(mapping=aes(x=species, y=logRich))+
     geom_violin() +
@@ -1983,14 +2007,16 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_disper_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
     mutate(Anbo=exp((Anbo))
-           ,Anma=exp((Anma))
-           ,Lica=exp((Lica))
-           ,Lipi=exp((Lipi))
-           ,Osse=exp((Osse))) %>%
-    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
+           ,Rhma=exp((Rhma))
+           ,Osse=exp((Osse))
+           ,Raca=exp((Raca))
+           ,Rapi=exp((Rapi))
+           ) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=disper_bray_curtis) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=disper_bray_curtis))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=disper_bray_curtis, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -2091,13 +2117,14 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_dist_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
     mutate(Anbo=inv_logit(Anbo)
-           ,Anma=inv_logit(Anma)
-           ,Lica=inv_logit(Lica)
-           ,Lipi=inv_logit(Lipi)
-           ,Osse=inv_logit(Osse)) %>%
-    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
+           ,Rhma=inv_logit(Rhma)
+           ,Osse=inv_logit(Osse)
+           ,Raca=inv_logit(Raca)
+           ,Rapi=inv_logit(Rapi)
+           ) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=distance_bray_curtis) %>%
     ggplot(mapping=aes(x=species, y=distance_bray_curtis))+
     geom_violin() +
@@ -2203,14 +2230,16 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_percInhib_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
     mutate(Anbo=inv_logit((Anbo))
-           ,Anma=inv_logit((Anma))
-           ,Lica=inv_logit((Lica))
-           ,Lipi=inv_logit((Lipi))
-           ,Osse=inv_logit((Osse))) %>%
-    dplyr::select(Anbo,Anma,Osse,Lica,Lipi) %>%
+           ,Rhma=inv_logit((Rhma))
+           ,Raca=inv_logit((Raca))
+           ,Osse=inv_logit((Osse))
+           ,Rapi=inv_logit((Rapi))
+           ) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=percInhib) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=percInhib))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=percInhib, x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -2295,9 +2324,10 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>=6) 
 samps_glmer_inhibRich_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Anma=V2, Lica=V3, Lipi=V4, Osse=V5) %>%
-    dplyr::select(Anbo,Anma,Lica,Lipi,Osse) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=inhibRich) %>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     ggplot(mapping=aes(x=species, y=inhibRich))+
     geom_violin() +
     geom_point(data=mf_all_noinfect, aes(y=log(inhibRich), x=species), position = position_jitter(width = 0.1, height=0.05), col="blue") +
@@ -2496,8 +2526,8 @@ anbo_con <- mf_con_with_inhibOTUs %>%
     scale_color_manual(values=set_col) + 
     ylab("Anbo") +
     xlab("")
-anma_con <- mf_con_with_inhibOTUs %>%
-    filter(species=="Anma") %>%
+rhma_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Rhma") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2506,10 +2536,10 @@ anma_con <- mf_con_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Anma")+
+    ylab("Rhma")+
     xlab("")
-lica_con <- mf_con_with_inhibOTUs %>%
-    filter(species=="Lica") %>%
+raca_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Raca") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2518,10 +2548,10 @@ lica_con <- mf_con_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Lica")+
+    ylab("Raca")+
     xlab("")
-lipi_con <- mf_con_with_inhibOTUs %>%
-    filter(species=="Lipi") %>%
+rapi_con <- mf_con_with_inhibOTUs %>%
+    filter(species=="Rapi") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2530,7 +2560,7 @@ lipi_con <- mf_con_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Lipi")+
+    ylab("Rapi")+
     xlab("")
 osse_con <- mf_con_with_inhibOTUs %>%
     filter(species=="Osse") %>%
@@ -2549,7 +2579,7 @@ lay_con <- rbind(c(1,1,1,1)
                  ,c(3,3,3,3)
                  , c(4,4,7,7)
                  , c(5,5,5,5))
-grid.arrange(anbo_con, anma_con, lica_con, lipi_con, osse_con
+grid.arrange(anbo_con, rhma_con, osse_con,raca_con, rapi_con
              , layout_matrix=lay_con
              , left = textGrob("Average proportion of reads", rot = 90, vjust = 1)
              , bottom = textGrob("Time", vjust=1))
@@ -2569,8 +2599,8 @@ anbo_treat <- mf_treat_with_inhibOTUs %>%
     scale_color_manual(values=set_col) + 
     ylab("Anbo") +
     xlab("")
-anma_treat <- mf_treat_with_inhibOTUs %>%
-    filter(species=="Anma") %>%
+rhma_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Rhma") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2579,10 +2609,10 @@ anma_treat <- mf_treat_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Anma") +
+    ylab("Rhma") +
     xlab("")
-lica_treat <- mf_treat_with_inhibOTUs %>%
-    filter(species=="Lica") %>%
+raca_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Raca") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2591,10 +2621,10 @@ lica_treat <- mf_treat_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Lica") +
+    ylab("Raca") +
     xlab("")
-lipi_treat <- mf_treat_with_inhibOTUs %>%
-    filter(species=="Lipi") %>%
+rapi_treat <- mf_treat_with_inhibOTUs %>%
+    filter(species=="Rapi") %>%
     group_by(species, toadID, G, time) %>%
     summarise(reads=mean(reads)) %>%
     ggplot(aes(x=time, y=reads)) +
@@ -2603,7 +2633,7 @@ lipi_treat <- mf_treat_with_inhibOTUs %>%
     facet_wrap(~toadID, nrow=1) +
     scale_fill_manual(values=set_col) + 
     scale_color_manual(values=set_col) + 
-    ylab("Lipi") +
+    ylab("Rapi") +
     xlab("")
 osse_treat <- mf_treat_with_inhibOTUs %>%
     filter(species=="Osse") %>%
@@ -2622,7 +2652,7 @@ lay_treat <- rbind(c(1,1,1,1,1,1)
                  ,c(3,3,3,3,3,3)
                  , c(4,7,7,7,7,7)
                  , c(5,5,5,5,5,5))
-grid.arrange(anbo_treat, anma_treat, lica_treat, lipi_treat, osse_treat
+grid.arrange(anbo_treat, rhma_treat,osse_treat, raca_treat, rapi_treat
              , layout_matrix=lay_treat
              , left = textGrob("Average proportion of reads", rot = 90, vjust = 1)
              , bottom = textGrob("Time", vjust=1))
@@ -2744,7 +2774,7 @@ for ( inhib in allInhibTaxa) {
             remove(stat_temp)
         }
         # indiv <- allIndiv[1]
-        # indiv <- "Lipi_3"
+        # indiv <- "Rapi_3"
         mf_temp <- mf_treat_with_inhibOTUs %>%
             filter(prepost=="Pre" | (prepost == "Pos" & PABD == TRUE)) %>%
             filter(G==inhib, toadID==indiv) %>%

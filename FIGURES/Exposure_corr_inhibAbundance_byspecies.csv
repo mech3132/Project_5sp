@@ -1,6 +1,6 @@
 Species,G,change,changetype,p_exposure,p_stat,change_con,change_con_type,p_exposure_control,p_stat_control
 Anbo,Acinetobacter,-0.91947820521956,Percent_change,0.03125,0,0.328027017247403,Percent_change,0.375,8
-Lica,Acinetobacter,-0.756572406535157,Percent_change,0.03125,0,-0.656823288303288,Percent_change,0.125,0
-Lica,Delftia,2.10101179178713,Percent_change,0.03125,21,8.97754870590231,Percent_change,0.125,10
-Lica,Brevundimonas,0.00500459016519262,Appeared,0.03125,21,2.41833473912196,Percent_change,0.197466073358019,9
 Osse,Acinetobacter,-0.518088888792807,Percent_change,0.03125,0,-0.669770684011555,Percent_change,0.375,2
+Raca,Acinetobacter,-0.756572406535157,Percent_change,0.03125,0,-0.656823288303288,Percent_change,0.125,0
+Raca,Delftia,2.10101179178713,Percent_change,0.03125,21,8.97754870590231,Percent_change,0.125,10
+Raca,Brevundimonas,0.00500459016519262,Appeared,0.03125,21,2.41833473912196,Percent_change,0.197466073358019,9

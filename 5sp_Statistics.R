@@ -44,10 +44,12 @@ all_p <- all_p %>%
     mutate(PABD=ifelse(infect>0,1,0), infect = log(infect+1)) %>%
     rename(eBD_log=infect) %>%
     separate(toadID, into=c("species","indiv"), remove=FALSE) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) %>%
     mutate(p_dist =ifelse(is.na(exp_dist),NA,p_dist))
 all_p_infected <- all_p_infected %>%
     mutate(PABD=ifelse(eBD_log>0,1,0)) %>%
-    separate(toadID, into=c("species","indiv"), remove=FALSE)
+    separate(toadID, into=c("species","indiv"), remove=FALSE) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi")))
 
 ### TESTING: Remove 0 values to test intensity
 all_p <- all_p %>%
@@ -1020,7 +1022,8 @@ mf_all_without_init_infect <- mf.rare %>%
 # combine all_p?
 # Is OTU richness and inhibitory bacterial richness related?
 all_p_withcon <- all_p_withcon %>%
-    separate(toadID, into=c("species","indiv"), remove = FALSE)
+    separate(toadID, into=c("species","indiv"), remove = FALSE) %>%
+    mutate(species=factor(species, levels=c("Anbo","Rhma","Osse","Raca","Rapi"))) 
 all_p_withcon %>%
     ggplot(aes(x=p_logRich, y=p_inhibRich)) +
     geom_point(aes(col=species), cex=3) +
@@ -1156,19 +1159,7 @@ mf_combined %>%
     geom_point(aes(col=Treatment,size=(time), pch=Infected))+
     scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
 mf_combined %>%
-    filter(species=="Anma") %>%
-    mutate(Treatment=BD_infected, Infected=PABD) %>%
-    ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
-    geom_point(aes(col=Treatment,size=(time), pch=Infected))+
-    scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
-mf_combined %>%
-    filter(species=="Lica") %>%
-    mutate(Treatment=BD_infected, Infected=PABD) %>%
-    ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
-    geom_point(aes(col=Treatment,size=(time), pch=Infected))+
-    scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
-mf_combined %>%
-    filter(species=="Lipi") %>%
+    filter(species=="Rhma") %>%
     mutate(Treatment=BD_infected, Infected=PABD) %>%
     ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
     geom_point(aes(col=Treatment,size=(time), pch=Infected))+
@@ -1179,7 +1170,18 @@ mf_combined %>%
     ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
     geom_point(aes(col=Treatment,size=(time), pch=Infected))+
     scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
-
+mf_combined %>%
+    filter(species=="Raca") %>%
+    mutate(Treatment=BD_infected, Infected=PABD) %>%
+    ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
+    geom_point(aes(col=Treatment,size=(time), pch=Infected))+
+    scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
+mf_combined %>%
+    filter(species=="Rapi") %>%
+    mutate(Treatment=BD_infected, Infected=PABD) %>%
+    ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
+    geom_point(aes(col=Treatment,size=(time), pch=Infected))+
+    scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
 
 
 #### Inhibitory ASVs: who is important? ####

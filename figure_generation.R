@@ -54,7 +54,6 @@ mf.rare %>%
 dev.off()
 
 
-
 #### Control data: how does it vary? ####
 # Calculate the hulls for each group
 # hull_toad <- mf_con_without_init_infect %>%
@@ -79,11 +78,11 @@ gg_infect <- mf_treat_without_init_infect  %>%
 
 temp1 <- mf_con_without_init_infect %>%
     dplyr::select(species, logRich) %>%
-    mutate(metric="log_OTU_Richness") %>%
+    mutate(metric="log_ASV_Richness") %>%
     rename(value=logRich)
 temp2 <- mf_con_without_init_infect %>%
     dplyr::select(species, inhibRich) %>%
-    mutate(metric="Inhibitory_OTU_Richness")%>%
+    mutate(metric="Inhib_ASV_Richness")%>%
     rename(value=inhibRich)
 temp3 <- mf_con_without_init_infect %>%
     dplyr::select(species, percInhib) %>%
@@ -91,18 +90,17 @@ temp3 <- mf_con_without_init_infect %>%
     rename(value=percInhib)
 temp4 <- mf_con_without_init_infect %>%
     dplyr::select(species, disper_bray_curtis) %>%
-    mutate(metric="Dispersion_from_centroid")%>%
+    mutate(metric="Dispersion")%>%
     rename(value=disper_bray_curtis)
 temp5 <- mf_con_without_init_infect %>%
     dplyr::select(species, distance_bray_curtis) %>%
-    mutate(metric="Distance_from_previous_timepoint")%>%
+    mutate(metric="Instability")%>%
     rename(value=distance_bray_curtis)
-
 
 gg_all <- rbind(temp1,temp2,temp3,temp4, temp5) %>%
     rename(Species=species) %>%
     mutate(Metric = gsub("_"," ",metric, fixed=TRUE)) %>%
-    mutate(Metric = factor(Metric, levels=c("log OTU Richness","Dispersion from centroid", "Distance from previous timepoint","Inhibitory OTU Richness","Percent Inhibitory"))) %>%
+    mutate(Metric = factor(Metric, levels=c("log ASV Richness","Inhib ASV Richness","Percent Inhibitory","Dispersion", "Instability"))) %>%
     ggplot(aes(x=Species, y=value)) +
     geom_boxplot() +
     geom_point(aes(col=Species), position = position_jitter(width=0.1, height=0), alpha=1/3)+
@@ -148,7 +146,7 @@ all_p %>%
     geom_ribbon(data=new.data, aes(x=p_inhibRich, ymin=ymin, ymax=ymax), alpha=0.2, col="lightgrey") +
     geom_line(data=new.data, aes(x=p_inhibRich, y=fit)) +
     ylab("Probability of infection") + 
-    xlab("Inhibitory OTU Richness (Percentile of species)") +
+    xlab("Inhibitory ASV Richness (Percentile of species)") +
     theme_classic()
 dev.off()
 
@@ -1460,10 +1458,10 @@ temp_indiv <- rep(mf_treat_without_init_infect %>%
     group_by(toadID, species) %>%
     summarize() %>%
     pull(toadID), length(all_G))
-row_names_expand <- paste(temp_g, temp_sp, temp_indiv, sep = "_" )
+row_names_expand <- paste(temp_g, as.character(temp_sp), temp_indiv, sep = "_" )
 
 heatmap_inhib <- as.data.frame(matrix(ncol=7, nrow=length(row_names_expand), dimnames = list(row_names_expand, c("temp_g","temp_sp","temp_indiv","Exposure_by_species","Exposure_by_indiv","BDcorr_by_species","BDcorr_by_indiv"))))
-heatmap_inhib[,c("temp_g","temp_sp","temp_indiv")] <- cbind(temp_g, temp_sp, temp_indiv)
+heatmap_inhib[,c("temp_g","temp_sp","temp_indiv")] <- cbind(temp_g, as.character(temp_sp), temp_indiv)
 for ( g in all_G ) {
     # By species; + or -
     exp_sp <- all_test_exp_sp %>%
@@ -1560,7 +1558,7 @@ heatmap_inhib_long <- heatmap_inhib %>%
     gather(key=Test_category, value=value,4:9) %>%
     mutate(Test_category=factor(Test_category, levels=c("Bacterial Genus","Amphib_Species","Change after exposure (Species)","Change after exposure (Individual)","Correlation w BD load (Species)", "Correlation w BD load (Indiv)")))
 
-for ( sp in c("Anbo","Anma","Lica","Lipi","Osse")) {
+for ( sp in c("Anbo","Rhma","Osse","Raca","Rapi")) {
     if ( sp=="Anbo") {
         
         # Number of TOTAL individuals for this species
@@ -1705,10 +1703,10 @@ gg_leg_change <- g_legend(heatmap_inhib_long %>%
 
 pdf("FIGURES/inhib_corr_exposure_bdload.pdf", height=7, width=12)
 grid.arrange(gg_heatmap_Anbo
-             ,gg_heatmap_Anma
-             ,gg_heatmap_Lica
-             ,gg_heatmap_Lipi
+             ,gg_heatmap_Rhma
              ,gg_heatmap_Osse
+             ,gg_heatmap_Raca
+             ,gg_heatmap_Rapi
              ,gg_leg_change
              , gg_leg_inhib
              , layout_matrix=rbind(c(rep(1,5),rep(c(2,3,4,5,6,6),each=4))
