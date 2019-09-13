@@ -125,7 +125,7 @@ dev.off()
 Anova(glm(PABD ~ species + p_inhibRich, family = binomial(link="logit"), data=all_p))
 glm_PABD_inhibRich <- glm(PABD ~ p_inhibRich, family = binomial(link="logit"), data=all_p)
 
-# x.predict <- data.frame(p_inhibRich=rep(seq(0,1, length.out = 100),times=5), species=rep(c("Anbo","Anma","Lica","Lipi","Osse"), each=100))
+# x.predict <- data.frame(p_inhibRich=rep(seq(0,1, length.out = 100),times=5), species=rep(c("Anbo","Rhma","Lica","Lipi","Osse"), each=100))
 x.predict <- data.frame(p_inhibRich=seq(0,1, length.out = 100))
 y.predict <- predict(glm_PABD_inhibRich, newdata = x.predict, type = "link", se.fit = TRUE)
 
@@ -810,12 +810,12 @@ grid.arrange(gg_Anbo_byspAcinetobacter
 dev.off()
 
 # 
-# num_G <- length(unique(all_tests_inhib%>%filter(Species=="Anma")%>%pull(G)))
-# num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Anma")%>%pull(toadID)))
-# pdf("FIGURES/by_EXPOSURE/Anma_exposure_byspecies.pdf", width=2.5*num_G, height=1.5*num_indiv)
-# grid.arrange(gg_Anma_byspLactococcus+theme(strip.text.y = element_blank())
-#              , gg_Anma_byspRalstonia+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-#              , gg_Anma_byspVariovorax+theme(axis.title.y=element_blank())
+# num_G <- length(unique(all_tests_inhib%>%filter(Species=="Rhma")%>%pull(G)))
+# num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Rhma")%>%pull(toadID)))
+# pdf("FIGURES/by_EXPOSURE/Rhma_exposure_byspecies.pdf", width=2.5*num_G, height=1.5*num_indiv)
+# grid.arrange(gg_Rhma_byspLactococcus+theme(strip.text.y = element_blank())
+#              , gg_Rhma_byspRalstonia+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+#              , gg_Rhma_byspVariovorax+theme(axis.title.y=element_blank())
 #              ,nrow=1)
 # dev.off()
 
@@ -965,15 +965,15 @@ grid.arrange(gg_Anbo_bytoadAcinetobacter+theme(strip.text.y = element_blank())
              ,nrow=1)
 dev.off()
 
-num_G <- length(unique(all_tests_inhib%>%filter(Species=="Anma")%>%pull(G)))
-num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Anma")%>%pull(toadID)))
-pdf("FIGURES/by_EXPOSURE/Anma_exposure_bytoadID.pdf", width=2.5*num_G, height=1.5*num_indiv)
-grid.arrange(gg_Anma_bytoadBrevundimonas+theme(strip.text.y = element_blank())
-             , gg_Anma_bytoadFlavobacterium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadMitsuaria+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadSphingobacterium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadTerrimonas+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadVariovorax+theme(axis.title.y=element_blank())
+num_G <- length(unique(all_tests_inhib%>%filter(Species=="Rhma")%>%pull(G)))
+num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Rhma")%>%pull(toadID)))
+pdf("FIGURES/by_EXPOSURE/Rhma_exposure_bytoadID.pdf", width=2.5*num_G, height=1.5*num_indiv)
+grid.arrange(gg_Rhma_bytoadBrevundimonas+theme(strip.text.y = element_blank())
+             , gg_Rhma_bytoadFlavobacterium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadMitsuaria+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadSphingobacterium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadTerrimonas+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadVariovorax+theme(axis.title.y=element_blank())
              ,nrow=1)
 dev.off()
 
@@ -1115,11 +1115,11 @@ grid.arrange(gg_Anbo_bysp_bdElizabethkingia+theme(strip.text.y = element_blank()
              ,nrow=1)
 dev.off()
 
-num_G <- length(unique(all_tests_inhib%>%filter(Species=="Anma")%>%pull(G)))
-num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Anma")%>%pull(toadID)))
-pdf("FIGURES/by_BDLOAD/Anma_BDload_byspecies.pdf", width=2.5*num_G, height=1.5*num_indiv)
-grid.arrange(gg_Anma_bysp_bdMicrobacterium+theme(strip.text.y = element_blank())
-             , gg_Anma_bysp_bdAcinetobacter+theme(axis.title.y=element_blank())
+num_G <- length(unique(all_tests_inhib%>%filter(Species=="Rhma")%>%pull(G)))
+num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Rhma")%>%pull(toadID)))
+pdf("FIGURES/by_BDLOAD/Rhma_BDload_byspecies.pdf", width=2.5*num_G, height=1.5*num_indiv)
+grid.arrange(gg_Rhma_bysp_bdMicrobacterium+theme(strip.text.y = element_blank())
+             , gg_Rhma_bysp_bdAcinetobacter+theme(axis.title.y=element_blank())
              ,nrow=1)
 dev.off()
 
@@ -1178,10 +1178,10 @@ grid.arrange(gg_Anbo_bysp2_bdAcinetobacter+theme(strip.text.y = element_blank())
              ,nrow=1)
 dev.off()
 
-num_G <- length(unique(all_tests_inhib%>%filter(Species=="Anma")%>%pull(G)))
-num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Anma")%>%pull(toadID)))
-pdf("FIGURES/by_BDLOAD/Anma_BDload_byspecies2.pdf", width=2.5*num_G, height=1.5*num_indiv)
-grid.arrange(gg_Anma_bysp2_bdMicrobacterium
+num_G <- length(unique(all_tests_inhib%>%filter(Species=="Rhma")%>%pull(G)))
+num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Rhma")%>%pull(toadID)))
+pdf("FIGURES/by_BDLOAD/Rhma_BDload_byspecies2.pdf", width=2.5*num_G, height=1.5*num_indiv)
+grid.arrange(gg_Rhma_bysp2_bdMicrobacterium
              ,nrow=1)
 dev.off()
 
@@ -1418,14 +1418,14 @@ grid.arrange(gg_Anbo_bytoadID_bdPedobacter+theme(strip.text.y = element_blank())
              ,nrow=1)
 dev.off()
 
-num_G <- length(unique(all_tests_inhib%>%filter(Species=="Anma")%>%pull(G)))
-num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Anma")%>%pull(toadID)))
-pdf("FIGURES/by_BDLOAD/Anma_BDload_bytoadID.pdf", width=2.5*num_G, height=1.5*num_indiv)
-grid.arrange(gg_Anma_bytoadID_bdMicrobacterium+theme(strip.text.y = element_blank())
-             , gg_Anma_bytoadID_bdMitsuaria+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadID_bdNovosphingobium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadID_bdRhizobium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
-             , gg_Anma_bytoadID_bdVariovorax+theme(axis.title.y=element_blank())
+num_G <- length(unique(all_tests_inhib%>%filter(Species=="Rhma")%>%pull(G)))
+num_indiv <- length(unique(mf_treat_with_inhibOTUs%>%filter(species=="Rhma")%>%pull(toadID)))
+pdf("FIGURES/by_BDLOAD/Rhma_BDload_bytoadID.pdf", width=2.5*num_G, height=1.5*num_indiv)
+grid.arrange(gg_Rhma_bytoadID_bdMicrobacterium+theme(strip.text.y = element_blank())
+             , gg_Rhma_bytoadID_bdMitsuaria+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadID_bdNovosphingobium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadID_bdRhizobium+theme(strip.text.y = element_blank(), axis.title.y=element_blank())
+             , gg_Rhma_bytoadID_bdVariovorax+theme(axis.title.y=element_blank())
              ,nrow=1)
 dev.off()
 
@@ -1545,7 +1545,7 @@ gg_color_hue <- function(n) {
 }
 
 sp_col <- gg_color_hue(5)
-names(sp_col) <- c("Anbo","Anma","Lica","Lipi","Osse")
+names(sp_col) <- c("Anbo","Rhma","Lica","Lipi","Osse")
 
 all_colors_heatmap <- c(color_taxa,sp_col, "1"="blue","-1"="red", "+"="blue","-"="red")
 
@@ -1943,8 +1943,8 @@ gg_anbo_inhib <- mf_combined %>%
     ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
     geom_point(aes(col=Treatment,size=(time), pch=Infected), show.legend = FALSE)+
     scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21))
-gg_anma_inhib <- mf_combined %>%
-    filter(species=="Anma") %>%
+gg_rhma_inhib <- mf_combined %>%
+    filter(species=="Rhma") %>%
     mutate(Treatment=BD_infected, Infected=PABD) %>%
     ggplot(aes(x=NMDS1_inhib, y=NMDS2_inhib)) +
     geom_point(aes(col=Treatment,size=(time), pch=Infected), show.legend = FALSE)+
@@ -1975,7 +1975,7 @@ gg_nmdsinhib_leg <- g_legend(mf_combined %>%
              scale_shape_manual(values=c(`TRUE`=16, `FALSE`=21)))
 
 pdf("FIGURES/nmds_allsp_inhib.pdf", width=12, height=10)
-grid.arrange(gg_anbo_inhib, gg_anma_inhib, gg_lica_inhib, gg_lipi_inhib, gg_osse_inhib, gg_nmdsinhib_leg, nrow=2)
+grid.arrange(gg_anbo_inhib, gg_rhma_inhib, gg_lica_inhib, gg_lipi_inhib, gg_osse_inhib, gg_nmdsinhib_leg, nrow=2)
 
 dev.off()
 
