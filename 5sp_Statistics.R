@@ -1240,6 +1240,23 @@ Anova(lm(log(disper_bray_curtis) ~ species+prepost*BD_infected, data=mf_all_with
 Anova(glm(inhibRich ~ species+prepost*BD_infected, data=mf_all_without_init_infect, family="poisson"), type=3)
 Anova(lm(percInhib ~ species+prepost*BD_infected, data=mf_all_without_init_infect), type=3)
 
+Anova(lm(log(disper_bray_curtis) ~ species + time+BD_infected*prepost, data=mf_all_without_init_infect), type=3)
+
+
+### TRying to disentangle con/treat and exposure for disperison
+mf_all_without_init_infect %>%
+    ggplot(aes(x=prepost, y=log(disper_bray_curtis))) +
+    geom_point() +
+    facet_grid(.~BD_infected )
+### Overage dispersion pre- and post- for each individual; then calculate.
+disper_prepost <- mf_all_without_init_infect %>%
+    group_by(toadID, species, prepost, BD_infected) %>%
+    summarize(logmean_disper =mean(log(disper_bray_curtis))) %>%
+    spread(key=prepost, value=logmean_disper) %>%
+    mutate(change_disper=Pos-Pre) 
+
+ggplot(disper_prepost)
+
 
 ### BONUS: affect of interaction treatment and PABD
 # For some reason, I can't get betareg to work so I'm using a logistic transformation instead.
@@ -1267,7 +1284,7 @@ anova(lm(log((disper_bray_curtis)) ~ species*BD_infected*prepost, data=mf_all_wi
 
 anova(lm(logRich ~ species+prepost/PABD, data=mf_treat_without_init_infect))
 Anova(glm(distance_bray_curtis ~ species+prepost/PABD, data=mf_treat_without_init_infect, family="quasibinomial"), type=2)
-anova(lm(log(disper_bray_curtis) ~ species+prepost/PABD, data=mf_treat_without_init_infect))
+anova(lm(log(disper_bray_curtis) ~ species+prepost/PABD, data=mf_treat_without_init_infect)) #### THIS IS AN IMPORTANT ONE
 Anova(glm(inhibRich ~ species+prepost/PABD, data=mf_treat_without_init_infect, family="poisson"), type=2)
 anova(lm(percInhib ~ species+prepost/PABD, data=mf_treat_without_init_infect))
 
@@ -1296,5 +1313,6 @@ Anova(lm(distance_bray_curtis ~ species*prepost, data=mf_con_without_init_infect
 Anova(lm(disper_bray_curtis ~ species*prepost, data=mf_con_without_init_infect), type=2)
 Anova(lm(inhibRich ~ species*prepost, data=mf_con_without_init_infect), type=3)
 Anova(lm(percInhib ~ species*prepost, data=mf_con_without_init_infect), type=3)
+
 
 

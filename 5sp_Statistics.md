@@ -1,7 +1,7 @@
 Statistical Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Wed Jul 31 09:50:26 2019
+Fri Sep 13 10:42:32 2019
 
 ``` r
 # Load packages
@@ -245,11 +245,11 @@ does_comp_differ_btwn_sp_and_across_time_and_infect_treat
     ##                    Df SumOfSqs       F Pr(>F)    
     ## species             4   344.67 43.6313  0.001 ***
     ## time                1    24.55 12.4311  0.001 ***
-    ## PABD                1     5.91  2.9942  0.016 *  
+    ## PABD                1     5.91  2.9942  0.010 ** 
     ## species:time        4    28.21  3.5707  0.001 ***
-    ## species:PABD        3     6.42  1.0835  0.338    
+    ## species:PABD        3     6.42  1.0835  0.350    
     ## time:PABD           1     9.80  4.9597  0.001 ***
-    ## species:time:PABD   2     5.67  1.4353  0.125    
+    ## species:time:PABD   2     5.67  1.4353  0.139    
     ## Residual          180   355.48                   
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -1373,9 +1373,9 @@ PABD_disper_inter
     ## 
     ##                  Df Deviance Resid. Df Resid. Dev Pr(>Chi)  
     ## NULL                                21     27.522           
-    ## species           4  12.2453        17     15.276  0.01562 *
-    ## p_disper          1   0.0200        16     15.256  0.88750  
-    ## species:p_disper  3   2.1255        13     13.131  0.54677  
+    ## species           4   12.245        17     15.276  0.01562 *
+    ## p_disper          1    0.020        16     15.256  0.88742  
+    ## species:p_disper  3    2.043        13     13.213  0.56354  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1388,9 +1388,9 @@ PABD_disper_main
     ## 
     ## Response: PABD
     ##                  LR Chisq Df Pr(>Chisq)  
-    ## species           11.4160  4    0.02227 *
-    ## p_disper           0.0200  1    0.88750  
-    ## species:p_disper   2.1255  3    0.54677  
+    ## species            11.499  4    0.02149 *
+    ## p_disper            0.020  1    0.88742  
+    ## species:p_disper    2.043  3    0.56354  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1419,10 +1419,10 @@ eBD_disper_inter1
     ## 
     ## Response: eBD_log_infected
     ##                  Df Sum Sq Mean Sq F value  Pr(>F)  
-    ## species           3 59.196 19.7321  7.5334 0.01352 *
-    ## p_disper          1 12.610 12.6102  4.8144 0.06428 .
-    ## species:p_disper  3  3.370  1.1232  0.4288 0.73876  
-    ## Residuals         7 18.335  2.6193                  
+    ## species           3 59.196 19.7321  8.0916 0.01122 *
+    ## p_disper          1 13.608 13.6077  5.5801 0.05018 .
+    ## species:p_disper  3  3.637  1.2124  0.4972 0.69578  
+    ## Residuals         7 17.070  2.4386                  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1434,11 +1434,11 @@ eBD_disper_main1
     ## Anova Table (Type II tests)
     ## 
     ## Response: eBD_log_infected
-    ##                  Sum Sq Df F value  Pr(>F)  
-    ## species          62.301  3  7.9286 0.01184 *
-    ## p_disper         12.610  1  4.8144 0.06428 .
-    ## species:p_disper  3.370  3  0.4288 0.73876  
-    ## Residuals        18.335  7                  
+    ##                  Sum Sq Df F value   Pr(>F)   
+    ## species          62.176  3  8.4989 0.009851 **
+    ## p_disper         13.608  1  5.5801 0.050176 . 
+    ## species:p_disper  3.637  3  0.4972 0.695782   
+    ## Residuals        17.070  7                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1464,10 +1464,10 @@ eBD_disper_inter
     ## 
     ## Response: eBD_log
     ##                  Df  Sum Sq Mean Sq F value    Pr(>F)    
-    ## species           4 110.258 27.5644 14.4791 0.0001025 ***
-    ## p_disper          1  10.821 10.8213  5.6843 0.0330495 *  
-    ## species:p_disper  3   5.041  1.6804  0.8827 0.4755404    
-    ## Residuals        13  24.749  1.9037                      
+    ## species           4 110.258 27.5644 15.2187 7.918e-05 ***
+    ## p_disper          1  11.342 11.3422  6.2622   0.02647 *  
+    ## species:p_disper  3   5.723  1.9077  1.0533   0.40224    
+    ## Residuals        13  23.546  1.8112                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -1486,10 +1486,10 @@ eBD_disper_main
     ## 
     ## Response: eBD_log
     ##                   Sum Sq Df F value    Pr(>F)    
-    ## species          105.203  4 13.8153 0.0001304 ***
-    ## p_disper          10.821  1  5.6843 0.0330495 *  
-    ## species:p_disper   5.041  3  0.8827 0.4755404    
-    ## Residuals         24.749 13                      
+    ## species          105.012  4 14.4946 0.0001019 ***
+    ## p_disper          11.342  1  6.2622 0.0264672 *  
+    ## species:p_disper   5.723  3  1.0533 0.4022387    
+    ## Residuals         23.546 13                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2164,10 +2164,10 @@ disper_PABD_inter
     ## 
     ## Response: p_disper
     ##               Df  Sum Sq   Mean Sq F value    Pr(>F)    
-    ## species        4 0.07820 0.0195492  5.2037 0.0005359 ***
-    ## PABD           1 0.01024 0.0102448  2.7270 0.1003323    
-    ## species:PABD   3 0.03376 0.0112530  2.9954 0.0320542 *  
-    ## Residuals    188 0.70628 0.0037568                      
+    ## species        4 0.10906 0.0272658  5.8870 0.0001745 ***
+    ## PABD           1 0.01207 0.0120737  2.6069 0.1080795    
+    ## species:PABD   3 0.03064 0.0102131  2.2051 0.0889220 .  
+    ## Residuals    188 0.87073 0.0046315                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2186,10 +2186,10 @@ disper_PABD_main
     ## 
     ## Response: p_disper
     ##               Sum Sq  Df F value   Pr(>F)   
-    ## species      0.05210   4  3.4674 0.009265 **
-    ## PABD         0.01024   1  2.7270 0.100332   
-    ## species:PABD 0.03376   3  2.9954 0.032054 * 
-    ## Residuals    0.70628 188                    
+    ## species      0.07743   4  4.1797 0.002887 **
+    ## PABD         0.01207   1  2.6069 0.108080   
+    ## species:PABD 0.03064   3  2.2051 0.088922 . 
+    ## Residuals    0.87073 188                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2219,11 +2219,11 @@ disper_eBD_inter
     ## Analysis of Variance Table
     ## 
     ## Response: p_disper
-    ##                  Df  Sum Sq   Mean Sq F value   Pr(>F)    
-    ## species           4 0.07820 0.0195492  5.0901 0.000646 ***
-    ## eBD_log           1 0.00692 0.0069153  1.8006 0.181263    
-    ## species:eBD_log   3 0.02132 0.0071065  1.8503 0.139533    
-    ## Residuals       188 0.72204 0.0038407                     
+    ##                  Df  Sum Sq   Mean Sq F value    Pr(>F)    
+    ## species           4 0.10906 0.0272658  5.7607 0.0002146 ***
+    ## eBD_log           1 0.00584 0.0058369  1.2332 0.2682021    
+    ## species:eBD_log   3 0.01779 0.0059287  1.2526 0.2920567    
+    ## Residuals       188 0.88982 0.0047331                      
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2241,11 +2241,11 @@ disper_eBD_main
     ## Anova Table (Type II tests)
     ## 
     ## Response: p_disper
-    ##                  Sum Sq  Df F value  Pr(>F)  
-    ## species         0.04871   4  3.1705 0.01501 *
-    ## eBD_log         0.00692   1  1.8006 0.18126  
-    ## species:eBD_log 0.02132   3  1.8503 0.13953  
-    ## Residuals       0.72204 188                  
+    ##                  Sum Sq  Df F value   Pr(>F)   
+    ## species         0.07507   4  3.9650 0.004106 **
+    ## eBD_log         0.00584   1  1.2332 0.268202   
+    ## species:eBD_log 0.01779   3  1.2526 0.292057   
+    ## Residuals       0.88982 188                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2269,10 +2269,10 @@ disper_eBD_inter1
     ## 
     ## Response: p_disper
     ##                          Df   Sum Sq   Mean Sq F value   Pr(>F)   
-    ## species                   3 0.056830 0.0189432  5.3195 0.004343 **
-    ## eBD_log_infected          1 0.000326 0.0003258  0.0915 0.764241   
-    ## species:eBD_log_infected  3 0.003527 0.0011758  0.3302 0.803553   
-    ## Residuals                32 0.113955 0.0035611                    
+    ## species                   3 0.064720 0.0215734  4.6081 0.008634 **
+    ## eBD_log_infected          1 0.001726 0.0017260  0.3687 0.548018   
+    ## species:eBD_log_infected  3 0.003916 0.0013053  0.2788 0.840261   
+    ## Residuals                32 0.149813 0.0046817                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2285,10 +2285,10 @@ disper_eBD_main1
     ## 
     ## Response: p_disper
     ##                            Sum Sq Df F value   Pr(>F)   
-    ## species                  0.053234  3  4.9829 0.005992 **
-    ## eBD_log_infected         0.000326  1  0.0915 0.764241   
-    ## species:eBD_log_infected 0.003527  3  0.3302 0.803553   
-    ## Residuals                0.113955 32                    
+    ## species                  0.063710  3  4.5361 0.009269 **
+    ## eBD_log_infected         0.001726  1  0.3687 0.548018   
+    ## species:eBD_log_infected 0.003916  3  0.2788 0.840261   
+    ## Residuals                0.149813 32                    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -2633,14 +2633,14 @@ all_stats
     ## ASV Richness            "p=0.754, F(1,13)=0.102"          
     ## Inhibitory ASV Richness "p=0.363, F(1,13)=0.888"          
     ## Proportion Inhibitory   "p=0.992, F(1,13)=0.000103"       
-    ## Dispersion              "p=0.033, F(1,13)=5.68"           
+    ## Dispersion              "p=0.0265, F(1,13)=6.26"          
     ## Instability             "p=0.057, F(1,11)=4.52"           
     ##                                                         
     ##                         "Infection intensity (no zeros)"
     ## ASV Richness            "p=0.581, F(1,7)=0.335"         
     ## Inhibitory ASV Richness "p=0.867, F(1,7)=0.03"          
     ## Proportion Inhibitory   "p=0.95, F(1,7)=0.00426"        
-    ## Dispersion              "p=0.0643, F(1,7)=4.81"         
+    ## Dispersion              "p=0.0502, F(1,7)=5.58"         
     ## Instability             "p=0.103, F(1,6)=3.68"          
     ##                                                            
     ##                         "Infection presence/absence"       
@@ -2648,21 +2648,21 @@ all_stats
     ## Inhibitory ASV Richness "p=0.662, F(1,188)=0.192"          
     ## Proportion Inhibitory   "p=0.147, F(1,188)=2.12"           
     ## Dispersion              "p=0.22, F(1,147)=1.52"            
-    ## Instability             "p=0.1, F(1,188)=2.73"             
+    ## Instability             "p=0.108, F(1,188)=2.61"           
     ##                         Effect of infection               
     ##                         "Infection intensity (with zeros)"
     ## ASV Richness            "p=0.175, F(1,188)=1.85"          
     ## Inhibitory ASV Richness "p=0.53, F(1,188)=0.396"          
     ## Proportion Inhibitory   "p=0.0268, F(1,188)=4.98"         
     ## Dispersion              "p=0.387, F(1,147)=0.754"         
-    ## Instability             "p=0.181, F(1,188)=1.8"           
+    ## Instability             "p=0.268, F(1,188)=1.23"          
     ##                                                         
     ##                         "Infection intensity (no zeros)"
     ## ASV Richness            "p=0.116, F(1,32)=2.61"         
     ## Inhibitory ASV Richness "p=0.97, F(1,32)=0.00148"       
     ## Proportion Inhibitory   "p=0.181, F(1,32)=1.87"         
     ## Dispersion              "p=0.847, F(1,28)=0.0379"       
-    ## Instability             "p=0.764, F(1,32)=0.0915"
+    ## Instability             "p=0.548, F(1,32)=0.369"
 
 ``` r
 write.csv(all_stats, "all_stats_driversofinfection.csv")
@@ -2803,13 +2803,13 @@ cor.test(all_p$p_disper, all_p$p_inhibRich, method="pearson")
     ##  Pearson's product-moment correlation
     ## 
     ## data:  all_p$p_disper and all_p$p_inhibRich
-    ## t = -0.58091, df = 20, p-value = 0.5678
+    ## t = -0.49339, df = 20, p-value = 0.6271
     ## alternative hypothesis: true correlation is not equal to 0
     ## 95 percent confidence interval:
-    ##  -0.5220693  0.3096091
+    ##  -0.5077915  0.3270699
     ## sample estimates:
     ##        cor 
-    ## -0.1288139
+    ## -0.1096601
 
 ``` r
 anova(lm(p_disper ~ p_inhibRich*species, data=all_p))
@@ -2819,10 +2819,10 @@ anova(lm(p_disper ~ p_inhibRich*species, data=all_p))
     ## 
     ## Response: p_disper
     ##                     Df  Sum Sq  Mean Sq F value Pr(>F)
-    ## p_inhibRich          1 0.00999 0.009990  0.2972 0.5949
-    ## species              4 0.10168 0.025420  0.7562 0.5717
-    ## p_inhibRich:species  3 0.05342 0.017806  0.5297 0.6697
-    ## Residuals           13 0.43699 0.033614
+    ## p_inhibRich          1 0.00828 0.008283  0.2109 0.6537
+    ## species              4 0.09989 0.024972  0.6358 0.6460
+    ## p_inhibRich:species  3 0.07004 0.023346  0.5944 0.6297
+    ## Residuals           13 0.51060 0.039277
 
 ``` r
 Anova(lm(p_disper ~ p_inhibRich*species, data=all_p), type="II")
@@ -2835,10 +2835,10 @@ Anova(lm(p_disper ~ p_inhibRich*species, data=all_p), type="II")
     ## 
     ## Response: p_disper
     ##                      Sum Sq Df F value Pr(>F)
-    ## p_inhibRich         0.00537  1  0.1597 0.6960
-    ## species             0.10168  4  0.7562 0.5717
-    ## p_inhibRich:species 0.05342  3  0.5297 0.6697
-    ## Residuals           0.43699 13
+    ## p_inhibRich         0.00775  1  0.1972 0.6643
+    ## species             0.09989  4  0.6358 0.6460
+    ## p_inhibRich:species 0.07004  3  0.5944 0.6297
+    ## Residuals           0.51060 13
 
 ``` r
 anova(lm(p_disper ~ p_inhibRich*species, data=all_p_withcon))
@@ -2848,10 +2848,10 @@ anova(lm(p_disper ~ p_inhibRich*species, data=all_p_withcon))
     ## 
     ## Response: p_disper
     ##                     Df  Sum Sq   Mean Sq F value Pr(>F)
-    ## p_inhibRich          1 0.00372 0.0037249  0.2137 0.6474
-    ## species              4 0.04405 0.0110115  0.6316 0.6439
-    ## p_inhibRich:species  4 0.09466 0.0236655  1.3574 0.2729
-    ## Residuals           29 0.50560 0.0174345
+    ## p_inhibRich          1 0.00816 0.0081601  0.4025 0.5308
+    ## species              4 0.04876 0.0121903  0.6013 0.6647
+    ## p_inhibRich:species  4 0.05747 0.0143663  0.7087 0.5926
+    ## Residuals           29 0.58789 0.0202720
 
 ``` r
 Anova(lm(p_disper ~ p_inhibRich*species, data=all_p_withcon), type="II")
@@ -2861,10 +2861,10 @@ Anova(lm(p_disper ~ p_inhibRich*species, data=all_p_withcon), type="II")
     ## 
     ## Response: p_disper
     ##                      Sum Sq Df F value Pr(>F)
-    ## p_inhibRich         0.00099  1  0.0568 0.8133
-    ## species             0.04405  4  0.6316 0.6439
-    ## p_inhibRich:species 0.09466  4  1.3574 0.2729
-    ## Residuals           0.50560 29
+    ## p_inhibRich         0.00537  1  0.2648 0.6107
+    ## species             0.04876  4  0.6013 0.6647
+    ## p_inhibRich:species 0.05747  4  0.7087 0.5926
+    ## Residuals           0.58789 29
 
 ``` r
 # Is diversity/richness correlated with stability?
@@ -3468,6 +3468,47 @@ Anova(lm(percInhib ~ species+prepost*BD_infected, data=mf_all_without_init_infec
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 ``` r
+Anova(lm(log(disper_bray_curtis) ~ species + time+BD_infected*prepost, data=mf_all_without_init_infect), type=3)
+```
+
+    ## Anova Table (Type III tests)
+    ## 
+    ## Response: log(disper_bray_curtis)
+    ##                     Sum Sq  Df F value    Pr(>F)    
+    ## (Intercept)          0.478   1  6.6902 0.0099863 ** 
+    ## species              3.784   4 13.2341 3.082e-10 ***
+    ## time                 0.244   1  3.4067 0.0655462 .  
+    ## BD_infected          0.931   1 13.0256 0.0003394 ***
+    ## prepost              0.345   1  4.8239 0.0285435 *  
+    ## BD_infected:prepost  0.028   1  0.3868 0.5342679    
+    ## Residuals           34.454 482                      
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+### TRying to disentangle con/treat and exposure for disperison
+mf_all_without_init_infect %>%
+    ggplot(aes(x=prepost, y=log(disper_bray_curtis))) +
+    geom_point() +
+    facet_grid(.~BD_infected )
+```
+
+![](5sp_Statistics_files/figure-markdown_github/unnamed-chunk-38-1.png)
+
+``` r
+### Overage dispersion pre- and post- for each individual; then calculate.
+disper_prepost <- mf_all_without_init_infect %>%
+    group_by(toadID, species, prepost, BD_infected) %>%
+    summarize(logmean_disper =mean(log(disper_bray_curtis))) %>%
+    spread(key=prepost, value=logmean_disper) %>%
+    mutate(change_disper=Pos-Pre) 
+
+ggplot(disper_prepost)
+```
+
+![](5sp_Statistics_files/figure-markdown_github/unnamed-chunk-38-2.png)
+
+``` r
 ### BONUS: affect of interaction treatment and PABD
 # For some reason, I can't get betareg to work so I'm using a logistic transformation instead.
 anova(lm(qlogis(y.transf.betareg(percInhib)) ~ species +BD_infected/PABD, data=mf_all_without_init_infect))
@@ -3572,7 +3613,7 @@ Anova(glm(distance_bray_curtis ~ species+prepost/PABD, data=mf_treat_without_ini
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 ``` r
-anova(lm(log(disper_bray_curtis) ~ species+prepost/PABD, data=mf_treat_without_init_infect))
+anova(lm(log(disper_bray_curtis) ~ species+prepost/PABD, data=mf_treat_without_init_infect)) #### THIS IS AN IMPORTANT ONE
 ```
 
     ## Analysis of Variance Table

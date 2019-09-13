@@ -1,7 +1,7 @@
 Exploratory Data Analysis for 5Sp Dataset
 ================
 Melissa Chen
-Wed Jul 31 09:11:02 2019
+Thu Sep 12 19:14:45 2019
 
 First, load required packages
 -----------------------------
@@ -1542,7 +1542,7 @@ where i = sample, j = individual, sp = species Below, we use the dataset with JU
 
 ``` r
 if ( RERUN_DISP) {
-    glmer_disper <- stan_glmer((disper_bray_curtis) ~ -1 + species + (1|toadID)
+    glmer_disper <- stan_glmer((disper_bray_curtis) ~ -1 + species + (1|toadID) + time
                            , data=mf_con_without_init_infect
                            , family = gaussian(link="log")
                            , prior_intercept = normal(location = 0,scale = 5, autoscale = TRUE)
@@ -1579,11 +1579,11 @@ pre_test_set <- mf_treat_without_init_infect %>%
     filter(time<=5) 
 samps_glmer_disper$beta  <- samps_glmer_disper$beta %>%
     as.data.frame() %>%
-    mutate(Anbo=exp(V1), Rhma=exp(V2), Osse=exp(V3), Raca=exp(V4), Rapi=exp(V5)) %>%
-    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi)
+    mutate(Anbo=exp(V1), Rhma=exp(V2), Osse=exp(V3), Raca=exp(V4), Rapi=exp(V5), Time=exp(V6)) %>%
+    dplyr::select(Anbo,Rhma,Osse,Raca,Rapi, Time)
 samps_glmer_disper$beta %>%
     gather(key=species, value=disper_bray_curtis) %>%
-    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
+    mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi","Time")))%>%
     ggplot(mapping=aes(x=species, y=(disper_bray_curtis)))+
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=(disper_bray_curtis), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
@@ -1604,19 +1604,56 @@ treat_indiv <- unique(mf_treat_without_init_infect$toadID)
 # List of each species
 species_list <- levels(factor(mf_con_without_init_infect$species))
 
+# Need multiple distributions depending on the time point
+# exp_distr_list <- list()
+# for ( t in sort(unique(mf_con_without_init_infect$time ))) {
+#     exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
+#     for ( num_sp in 1:length(species_list)) {
+#         
+#         exp_distr[,num_sp] <- rlnorm(length(samps_glmer_disper$beta[,num_sp])
+#                                      ,meanlog=log(rnorm(4000, mean=samps_glmer_disper$beta[,num_sp]+samps_glmer_disper$beta[,"Time"]*t, sd=toadID_sigma))
+#                                      ,sdlog=sigma )
+#         
+#     }
+#     exp_distr_list[[t]] <- exp_distr
+# }
+
+## OLD VERSION
 exp_distr <- as.data.frame(matrix(ncol=length(species_list), nrow=4000, dimnames = list(1:4000, species_list)))
 for ( num_sp in 1:length(species_list)) {
-
     exp_distr[,num_sp] <- rlnorm(length(samps_glmer_disper$beta[,num_sp])
-                                ,meanlog=log(rnorm(4000, mean=samps_glmer_disper$beta[,num_sp], sd=toadID_sigma))
-                                ,sdlog=sigma )
-    
-}
+                                 ,meanlog=log(rnorm(4000, mean=samps_glmer_disper$beta[,num_sp], sd=toadID_sigma))
+                                 ,sdlog=sigma )
+}    
 
+
+# ### NEW VERSION Need multiple distributions depending on the time point
+# 
+# exp_distr <- as.data.frame(matrix(ncol=length(species_list)*length(sort(unique(mf_con_without_init_infect$time))), nrow=4000, dimnames = list(1:4000, paste0(rep(species_list,each=16),"_", sort(unique(mf_con_without_init_infect$time))))))
+# for ( t in sort(unique(mf_con_without_init_infect$time))) {
+#     for ( num_sp in 1:length(species_list)) {
+#         exp_distr[,paste0(colnames(samps_glmer_disper$beta)[num_sp],"_", t)] <- rlnorm(length(samps_glmer_disper$beta[,num_sp])
+#                                      ,meanlog=log(rnorm(4000, mean=samps_glmer_disper$beta[,num_sp], sd=toadID_sigma))
+#                                      ,sdlog=sigma ) + log(samps_glmer_disper$beta[,"Time"])*t
+#         }
+#     
+# }
+# 
+# 
+# ### OLD VERSION
+# exp_distr %>%
+#     gather(key=species, value=disper_bray_curtis) %>%
+#     mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
+#     ggplot(aes(x=species, y=disper_bray_curtis)) +
+#     geom_violin() +
+#     geom_point(data=mf_con_without_init_infect, aes(y=(disper_bray_curtis), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
+#     geom_point(data=pre_test_set, aes(y=(disper_bray_curtis), x=species), position=position_jitter(width = 0.1, height=0), col="red")
+
+### NEW WORKING VERSION
 exp_distr %>%
     gather(key=species, value=disper_bray_curtis) %>%
     mutate(species=factor(species,levels=c("Anbo","Rhma","Osse","Raca","Rapi")))%>%
-    ggplot(aes(x=species, y=disper_bray_curtis)) +
+    ggplot(aes(x=species, y=(disper_bray_curtis+log(samps_glmer_disper$beta[,"Time"])*8))) +
     geom_violin() +
     geom_point(data=mf_con_without_init_infect, aes(y=(disper_bray_curtis), x=species), position = position_jitter(width = 0.1, height=0), col="blue") +
     geom_point(data=pre_test_set, aes(y=(disper_bray_curtis), x=species), position=position_jitter(width = 0.1, height=0), col="red")
@@ -1625,6 +1662,48 @@ exp_distr %>%
 ![](5sp_EDA_files/figure-markdown_github/unnamed-chunk-24-2.png)
 
 ``` r
+# ### OLD 
+# # Now, we can calculate the probability that the "test" dataset values come from this distribution
+# # List of individuals
+# treat_indiv <- unique(mf_treat_without_init_infect$toadID)
+# # Loop through and calculate probability of having diversity at that level
+# pre_exp_indiv <- data.frame(toadID=treat_indiv, exp_disper=rep(NA, length(treat_indiv)), p_disper=rep(NA, length(treat_indiv)), infect=rep(NA, length(treat_indiv)))
+# for ( i in treat_indiv ) {
+#     n_row <- match(i, treat_indiv)
+#     sp <- unlist(strsplit(i,"_"))
+#     num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
+#     temp_disper <- mf_treat_without_init_infect %>%
+#         filter(toadID==i, time <=5 ) %>%
+#         filter(!is.na(disper_bray_curtis))%>%
+#         filter(!is.na(n))%>%
+#         dplyr::select(disper_bray_curtis) %>%
+#         # mutate(disper_bray_curtis = log(disper_bray_curtis)) %>%
+#         pull()
+#     
+#     if ( length(temp_disper) > 1) {
+#         exp_disper <-  (fitdistr((temp_disper), "lognormal")$estimate[1])
+#         
+#     } else if ( length(temp_bc) == 1) {
+#         exp_disper <- exp(temp_disper)
+#     } else {
+#         exp_disper <- NA
+#     }
+#     
+#     # dm is disperance matrix; larger exp_mu means more dissimilar. We want to know if MORE dissimilar == MORE infection
+#     p_disper <- sum(exp_distr[,sp[1]]<exp(exp_disper), na.rm=TRUE)/length(exp_distr[,sp[1]])
+#     
+#     ### Did they get infected?
+#     infect <- max(mf_treat_without_init_infect %>%
+#                       filter(toadID==i) %>%
+#                       dplyr::select(eBD_raw) %>%
+#                       pull()
+#     )
+#     
+#     pre_exp_indiv[n_row,c("exp_disper","p_disper","infect")] <- c(exp_disper, p_disper, infect)
+#     
+# }
+
+### NEW
 # Now, we can calculate the probability that the "test" dataset values come from this distribution
 # List of individuals
 treat_indiv <- unique(mf_treat_without_init_infect$toadID)
@@ -1634,6 +1713,7 @@ for ( i in treat_indiv ) {
     n_row <- match(i, treat_indiv)
     sp <- unlist(strsplit(i,"_"))
     num_sp <- match(sp[1], levels(factor(mf_con_without_init_infect$species)))
+    # times <- mf_treat_without_init_infect[which(mf_treat_without_init_infect$toadID == i),"time"]
     temp_disper <- mf_treat_without_init_infect %>%
         filter(toadID==i, time <=5 ) %>%
         filter(!is.na(disper_bray_curtis))%>%
@@ -1641,6 +1721,15 @@ for ( i in treat_indiv ) {
         dplyr::select(disper_bray_curtis) %>%
         # mutate(disper_bray_curtis = log(disper_bray_curtis)) %>%
         pull()
+    times <- mf_treat_without_init_infect %>%
+        filter(toadID==i, time <=5 ) %>%
+        filter(!is.na(disper_bray_curtis))%>%
+        filter(!is.na(n))%>%
+        dplyr::select(time) %>%
+        # mutate(disper_bray_curtis = log(disper_bray_curtis)) %>%
+        pull()
+    
+    temp_disper <- temp_disper - times*log(mean(samps_glmer_disper$beta[,"Time"]))
     
     if ( length(temp_disper) > 1) {
         exp_disper <-  (fitdistr((temp_disper), "lognormal")$estimate[1])
@@ -1666,18 +1755,19 @@ for ( i in treat_indiv ) {
 }
 
 
+
 # Get estimates for control toads
 disper_species_exp <- fixef(glmer_disper)  %>%
     as_tibble() %>%
-    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi"))
-
+    mutate(species=c("Anbo", "Rhma","Osse","Raca","Rapi","Time"))
+######## STOP HERE 
 con_toad_est_disper <- ranef(glmer_disper)$toadID %>%
     rename(sp_est="(Intercept)") %>%
     mutate(toadID=rownames(ranef(glmer_disper)$toadID)) %>%
     separate(toadID, into=c("species","num"), sep="_",remove=FALSE) %>%
     dplyr::select(-num) %>%
     left_join(disper_species_exp, by = "species") %>%
-    mutate(est_disper=(sp_est+ value))
+    mutate(est_disper=(sp_est+ value)) 
 
 con_exp_indiv_disper <- data.frame(toadID=con_toad_est_disper$toadID, exp_disper=rep(NA, length(con_toad_est_disper$toadID)), p_disper=rep(NA, length(con_toad_est_disper$toadID)))
 for ( i in 1:nrow(con_toad_est_disper) ) {
@@ -2887,7 +2977,7 @@ all_p_infected <- pos_exp_indiv %>%
 
 #### Dispersion ####
 if ( RERUN_DISP ) {
-    glmer_disper_all <- stan_glmer(disper_bray_curtis ~ -1 + species + (1|toadID)
+    glmer_disper_all <- stan_glmer(disper_bray_curtis ~ -1 + species + (1|toadID) + time
                                , data=mf_all_noinfect
                                , family = gaussian(link="log")
                                , prior_intercept = normal(location = 0,scale = 2.5, autoscale = TRUE)
@@ -2924,12 +3014,13 @@ pos_test_set <- mf_treat_without_init_infect %>%
     filter(time>5) 
 samps_glmer_disper_all$beta %>%
     as.data.frame() %>%
-    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5) %>%
+    rename(Anbo=V1, Rhma=V2, Osse=V3, Raca=V4, Rapi=V5, Time=V6) %>%
     mutate(Anbo=exp((Anbo))
            ,Rhma=exp((Rhma))
            ,Osse=exp((Osse))
            ,Raca=exp((Raca))
            ,Rapi=exp((Rapi))
+           ,Time=exp((Time))
            ) %>%
     dplyr::select(Anbo,Rhma,Osse,Raca,Rapi) %>%
     gather(key=species, value=disper_bray_curtis) %>%
@@ -2973,7 +3064,7 @@ pos_exp_indiv <- mf_treat_without_init_infect %>%
     dplyr::select(toadID, time, species, disper_bray_curtis, eBD_log) %>%
     mutate(p_disper=NA)
 for ( r in 1:nrow(pos_exp_indiv)) {
-    pos_exp_indiv[r,"p_disper"] <- sum(exp_distr[,pos_exp_indiv$toadID[r]]<pos_exp_indiv[r,"disper_bray_curtis"])/4000
+    pos_exp_indiv[r,"p_disper"] <- sum((exp_distr[,pos_exp_indiv$toadID[r]] + (mean(samps_glmer_disper_all$beta[,6]))*pos_exp_indiv[r,"time"])<pos_exp_indiv[r,"disper_bray_curtis"])/4000
 }
 
 gg_beta_pos_p <- pos_exp_indiv %>%
